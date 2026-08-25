@@ -1,14 +1,6 @@
 package revxrsal.kitsune.ipc
 
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 
 /**
  * One exported function, in whichever of the two shapes it was declared.
@@ -51,7 +43,7 @@ class FunctionHandler(
     init {
         require(functions.size == exportedNames.size) {
             "Function tables disagree on how many exports there are: " +
-                "${functions.size} functions, ${exportedNames.size} names"
+                    "${functions.size} functions, ${exportedNames.size} names"
         }
     }
 
@@ -85,7 +77,7 @@ class FunctionHandler(
         is ExportedFunction.Blocking -> function(request)
         is ExportedFunction.Suspending -> throw IllegalStateException(
             "'${exportedNames[ordinal]}' is a suspend function; use callBlocking() or " +
-                "launchCall() instead of call()."
+                    "launchCall() instead of call()."
         )
     }
 
@@ -116,20 +108,41 @@ class FunctionHandler(
      * is delivered as a failed [Result] rather than thrown, so a host callback
      * sees both outcomes through one path.
      */
+    private val COMPLETED: Job = Job().apply { complete() }
+
+    private inline fun deliver(onComplete: (Result<ByteArray>) -> Unit, r: Result<ByteArray>) {
+        try {
+            onComplete(r)
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     fun launchCall(
         ordinal: Int,
         request: ByteArray,
         onComplete: (Result<ByteArray>) -> Unit,
     ): Job {
-        val d = scope.async {
+        // Resolution failure is delivered, never thrown at the caller.
+        val f = try {
+            resolve(ordinal)
+        } catch (t: Throwable) {
+            deliver(onComplete, Result.failure(t))
+            return COMPLETED
+        }
+
+        // FAST PATH: no coroutine, no dispatch.
+        if (f is ExportedFunction.Blocking) {
+            deliver(onComplete, runCatching { f(request) })
+            return COMPLETED
+        }
+
+        // Suspending: run inline until the first real suspension point.
+        f as ExportedFunction.Suspending
+        val d = scope.async(start = CoroutineStart.UNDISPATCHED) {
             try {
-                val f = resolve(ordinal)
-                Result.success(
-                    when (f) {
-                    is ExportedFunction.Blocking -> withContext(Dispatchers.IO) { f(request) }
-                    is ExportedFunction.Suspending -> f(request)
-                })
+                Result.success(f(request))
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
@@ -137,15 +150,7 @@ class FunctionHandler(
             }
         }
         d.invokeOnCompletion { cause ->
-            val r = if (cause != null)
-                Result.failure(cause)
-            else
-                d.getCompleted()
-            try {
-                onComplete(r)
-            } catch (t: Throwable) {
-                t.printStackTrace()
-            }
+            deliver(onComplete, if (cause != null) Result.failure(cause) else d.getCompleted())
         }
         return d
     }
@@ -165,7 +170,7 @@ class FunctionHandler(
         if (ordinal < 0 || ordinal >= functions.size) {
             throw NoSuchElementException(
                 "No exported function at ordinal $ordinal. Known: ${functions.size} functions, " +
-                    "${exportedNames.asList()}"
+                        "${exportedNames.asList()}"
             )
         }
         return functions[ordinal]

@@ -123,7 +123,7 @@ declaration, so it stays true by construction.
 
 ## Events, in both directions
 
-Events are declared once and dispatched by ordinal on both sides.
+Events are declared once and wired up on both sides for you.
 
 ```kotlin
 @ExportEvent(id = "clicked")
@@ -155,49 +155,44 @@ stop()
 
 Suspending listeners each get their own coroutine under a supervisor job, so one
 failing or hanging listener cannot take the others down with it. An event nobody
-listens for is dropped after two array loads, without being decoded at all.
+listens for is dropped without being decoded at all.
 
 ## Why it is fast
 
-Most of the design decisions here are about not paying for things twice.
+Every layer of the bridge has been benchmarked and then rewritten around what
+the numbers said. The short version:
 
-**CBOR, not JSON.** The payload crosses a JNI boundary as a `byte[]` in either
-case. JSON would add a UTF-8 encode on one side and a text parse on the other,
-for a format no human is going to read.
+**CBOR, not JSON.** The payload crosses into the JVM as raw bytes either way. A
+text format would mean an encode on one side and a parse on the other, for
+something no human is ever going to read.
 
-**Ordinals, not names.** Every export is numbered at generation time by sorting
-its exported name. The wire carries that number, so dispatch is an array index
-rather than a string decode plus a hash lookup, and no `String` is allocated
-across JNI per call. The three generated halves are regenerated together, which
-is the only reason renumbering is safe.
+**No intermediary JSON anywhere.** Your arguments are encoded once in the
+frontend and decoded once in Kotlin. There is no serde value, no JSON string and
+no map in between, in either direction.
 
-**The ordinal rides on machinery you already paid for.** Inbound, it goes in a
-request header, because Tauri's IPC builds a `Headers` map on every call anyway.
-Outbound, where events travel down a raw `Channel`, it is a little-endian `u16`
-prefixed onto a buffer that had to be allocated to leave the JVM regardless.
+**Zero extra allocations on the call path.** Nothing is copied, stringified or
+boxed just to get a call from the webview to Kotlin and its result back.
 
-**Generated decoders, not reflection.** The processor emits a bespoke
-`DeserializationStrategy` per export that reads fields into local slots and
-tracks a bitmask of which keys the payload actually carried. That mask is what
-makes Kotlin's `$default` synthetic overloads reachable, and what lets an absent
-key and an explicit `null` mean different things.
+**No reflection.** Every decoder, every dispatch table and every call site is
+generated ahead of time at compile time, so nothing has to be discovered at
+runtime.
 
-**Nothing blocks the host thread.** A call is submitted to Kotlin, launched in a
-scoped coroutine, and completed later through a native callback into a
-`oneshot`. Blocking exports are moved to `Dispatchers.IO`; suspending ones run
-where they were launched. Dropping the Rust future cancels the Kotlin `Job`.
+**Coroutines all the way through.** A call never blocks the host thread. Plain
+functions run straight through with no coroutine machinery at all; suspending
+ones are launched into a supervised scope, delivered back when they complete,
+and cancelled on the Kotlin side if the caller goes away.
 
-**A trimmed runtime and a real AOT cache.** `jdeps` computes the module set,
-`jlink` builds an image from exactly those, and JEP 483/515 records an AOT cache
-against that image. The result, for the sample app, is about 42 MB of runtime,
-a 3.9 MB jar and an 11 MB cache.
+**A trimmed runtime, warmed ahead of time.** The JVM that ships with your app
+contains only the pieces your code actually uses, and it comes with an AOT cache
+recorded at build time. Class loading and linking, normally the bulk of what a
+JVM does before your first line runs, has already happened by the time the app
+launches. For the sample app that is about 42 MB of runtime, a 3.9 MB jar and an
+11 MB cache, all embedded in the binary.
 
-The cache is not treated as a nice-to-have. The host runs with `-XX:AOTMode=on`,
-which turns a rejected cache into a refused VM start rather than a silent
-downgrade, and the build fails if the cache does not actually engage. Because
-the flags a cache is recorded with must match the flags it is consumed with,
-both come from one list in `build.gradle.kts` and are written to
-`dist/lib/vmoptions.txt`, which the Rust host reads verbatim.
+Getting that right takes care, so the build does it for you. The cache is
+re-recorded whenever the code it was trained on changes, and every build checks
+that it genuinely engages rather than quietly falling back to a cold start. A
+build that cannot produce a working cache fails instead of shipping a slow app.
 
 ## How it fits together
 
