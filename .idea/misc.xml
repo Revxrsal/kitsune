@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="FrameworkDetectionExcludesConfiguration">
+    <file type="web" url="file://$PROJECT_DIR$/app" />
+  </component>
+  <component name="GithubDefaultAccount">
+    <option name="defaultAccountId" value="dd4f13fa-e119-4dab-9fc7-3e9b337224b7" />
+  </component>
+  <component name="ProjectRootManager" version="2">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+</project>

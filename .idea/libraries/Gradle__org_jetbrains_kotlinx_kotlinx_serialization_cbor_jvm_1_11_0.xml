@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: org.jetbrains.kotlinx:kotlinx-serialization-cbor-jvm:1.11.0" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="org.jetbrains.kotlinx" artifactId="kotlinx-serialization-cbor-jvm" version="1.11.0" baseVersion="1.11.0" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-cbor-jvm/1.11.0/9f80a700f704b16e873ce1723e838e3062cf99a/kotlinx-serialization-cbor-jvm-1.11.0.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-cbor-jvm/1.11.0/e80503d66ccc452c7dd0558afe219db3a67a920c/kotlinx-serialization-cbor-jvm-1.11.0-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

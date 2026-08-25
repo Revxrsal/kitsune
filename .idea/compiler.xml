@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CompilerConfiguration">
+    <bytecodeTargetLevel>
+      <module name="app" target="25" />
+      <module name="app.buildSrc" target="21" />
+      <module name="app.buildSrc.main" target="21" />
+      <module name="app.buildSrc.test" target="21" />
+      <module name="app.codegen" target="21" />
+      <module name="app.codegen.main" target="21" />
+      <module name="app.codegen.test" target="21" />
+      <module name="app.main" target="25" />
+      <module name="app.test" target="25" />
+    </bytecodeTargetLevel>
+  </component>
+</project>
