@@ -1,4 +1,4 @@
-package revxrsal.kitsune.annotation
+package revxrsal.kitsune.app
 
 @Target(AnnotationTarget.CLASS)
 annotation class KitsuneEntrypoint

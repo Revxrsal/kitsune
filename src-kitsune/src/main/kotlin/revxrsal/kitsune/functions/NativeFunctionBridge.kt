@@ -1,10 +1,11 @@
-package revxrsal.kitsune.app
+package revxrsal.kitsune.functions
 
 import kotlinx.coroutines.Job
+import revxrsal.kitsune.app.application
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
 
-object Bridge {
+object NativeFunctionBridge {
 
     private val jobs = ConcurrentHashMap<Long, Job>()
 

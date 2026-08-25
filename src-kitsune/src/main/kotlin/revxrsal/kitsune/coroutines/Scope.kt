@@ -1,4 +1,4 @@
-package revxrsal.kitsune.ipc
+package revxrsal.kitsune.coroutines
 
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName

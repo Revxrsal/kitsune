@@ -1,7 +1,8 @@
-package revxrsal.kitsune
+package revxrsal.kitsune.aot
 
 import java.io.File
 import java.util.jar.JarFile
+import kotlin.collections.iterator
 
 /**
  * Entry point for the AOT training run (`:aotCache`).

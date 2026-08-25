@@ -23,10 +23,10 @@ object Annotations {
 
     const val PACKAGE = "revxrsal.kitsune.annotation"
 
-    const val EXPORT_FUNCTION = "$PACKAGE.ExportFunction"
-    const val EXPORT_EVENT = "$PACKAGE.ExportEvent"
-    const val LISTENER = "$PACKAGE.Listener"
-    const val ENTRYPOINT = "$PACKAGE.KitsuneEntrypoint"
+    const val EXPORT_FUNCTION = "revxrsal.kitsune.functions.ExportFunction"
+    const val EXPORT_EVENT = "revxrsal.kitsune.event.ExportEvent"
+    const val LISTENER = "revxrsal.kitsune.event.Listener"
+    const val ENTRYPOINT = "revxrsal.kitsune.app.KitsuneEntrypoint"
 }
 
 /** Package name reserved for generated code; user code may not live in it. */

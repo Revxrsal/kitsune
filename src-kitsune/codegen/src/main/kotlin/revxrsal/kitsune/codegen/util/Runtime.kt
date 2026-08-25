@@ -15,6 +15,8 @@ import com.squareup.kotlinpoet.MemberName
 object Runtime {
 
     const val IPC_PACKAGE = "revxrsal.kitsune.ipc"
+    const val FUNCTIONS_PACKAGE = "revxrsal.kitsune.functions"
+    const val EVENTS_PACKAGE = "revxrsal.kitsune.event"
 
     /**
      * Base class of every entry point. Constructing one is what installs the
@@ -29,11 +31,11 @@ object Runtime {
     /** The `null` that fills every synthetic method's trailing marker slot. */
     val DefaultConstructorMarker = MemberName(IPC_PACKAGE, "DEFAULT_CONSTRUCTOR_MARKER")
 
-    val FunctionHandler = ClassName(IPC_PACKAGE, "FunctionHandler")
-    val EventHandler = ClassName(IPC_PACKAGE, "EventHandler")
+    val FunctionHandler = ClassName(FUNCTIONS_PACKAGE, "FunctionHandler")
+    val EventHandler = ClassName(EVENTS_PACKAGE, "EventHandler")
 
     /** The sealed registry entry, and its two shapes. */
-    val ExportedFunction = ClassName(IPC_PACKAGE, "ExportedFunction")
+    val ExportedFunction = ClassName(FUNCTIONS_PACKAGE, "ExportedFunction")
     val BlockingFunction = ExportedFunction.nestedClass("Blocking")
     val SuspendingFunction = ExportedFunction.nestedClass("Suspending")
 }

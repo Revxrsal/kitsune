@@ -53,7 +53,7 @@ kitsune {
 
     // Not MainKt: the training run has no Rust host attached, so it must not
     // invoke Bridge's external funs. See Training.kt.
-    trainingMainClass.set("revxrsal.kitsune.Training")
+    trainingMainClass.set("revxrsal.kitsune.aot.Training")
 
     // Flags shared by the AOT training runs and the Rust host. Changing this
     // list rebuilds the cache; the host picks it up from dist/lib/vmoptions.txt

@@ -14,7 +14,7 @@ type FxMap = HashMap<u64, oneshot::Sender<KotlinResult>, BuildHasherDefault<FxHa
 static PENDING: Mutex<FxMap> = Mutex::new(HashMap::with_hasher(BuildHasherDefault::new()));
 
 bind_java_type! {
-    pub Bridge => revxrsal.kitsune.app.Bridge,
+    pub Bridge => revxrsal.kitsune.functions.NativeFunctionBridge,
     methods {
         static fn submit(id: jlong, ordinal: jint, request: jbyte[]),
         static fn cancel(id: jlong),

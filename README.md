@@ -34,7 +34,7 @@ time, embedded straight into the Tauri binary.
 Here is the entire backend of a small app:
 
 ```kotlin
-package revxrsal.kitsune.test
+package revxrsal.kitsune.aot
 
 @ExportFunction
 fun version(): String = "1.0"
@@ -81,22 +81,22 @@ object TestApplication : KitsuneApplication() {
 Build, and `src/bindings.ts` appears next to your frontend code:
 
 ```ts
-/** `revxrsal.kitsune.test.version` */
+/** `revxrsal.kitsune.aot.version` */
 export function version(): Promise<string> { ... }
 
-/** `revxrsal.kitsune.test.add` */
+/** `revxrsal.kitsune.aot.add` */
 export function add(args: { a: number; b: number }): Promise<number> { ... }
 
-/** `revxrsal.kitsune.test.reverse` */
+/** `revxrsal.kitsune.aot.reverse` */
 export function reverse(args: { input?: string; times?: number } = {}): Promise<string> { ... }
 
-/** `revxrsal.kitsune.test.label` */
+/** `revxrsal.kitsune.aot.label` */
 export function label(args: { text?: string | null } = {}): Promise<string> { ... }
 
-/** `revxrsal.kitsune.test.fetch` */
+/** `revxrsal.kitsune.aot.fetch` */
 export function fetch(args: { url: string }): Promise<string> { ... }
 
-/** `revxrsal.kitsune.test.Store.load` */
+/** `revxrsal.kitsune.aot.Store.load` */
 export function load(args: { key?: string; limit?: number } = {}): Promise<string> { ... }
 ```
 

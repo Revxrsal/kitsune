@@ -2,7 +2,7 @@
 //
 // Written by Kitsune's KSP processor from the `@KitsuneEntrypoint` declaration:
 //
-//     revxrsal.kitsune.test.TestApplication
+//     revxrsal.kitsune.TestApplication
 //
 // Move the annotation to change what this hands control to. Editing this file
 // only means losing the edit on the next Gradle build.
@@ -24,7 +24,7 @@ pub fn enter_app(env: &mut Env) -> anyhow::Result<()> {
     // class *is* the handover; there is no constructor for the host to call.
     LoaderContext::None.load_class(
         env,
-        jni_str!("revxrsal.kitsune.test.TestApplication"),
+        jni_str!("revxrsal.kitsune.TestApplication"),
         true,
     )?;
     Ok(())

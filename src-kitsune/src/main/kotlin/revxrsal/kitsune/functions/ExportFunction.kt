@@ -1,4 +1,4 @@
-package revxrsal.kitsune.annotation
+package revxrsal.kitsune.functions
 
 /**
  * Exposes a function to the Rust host.

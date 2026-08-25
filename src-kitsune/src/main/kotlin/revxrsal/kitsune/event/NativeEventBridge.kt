@@ -1,8 +1,8 @@
-package revxrsal.kitsune.app
+package revxrsal.kitsune.event
 
-import revxrsal.kitsune.ipc.EventSource
+import revxrsal.kitsune.app.application
 
-object Events {
+object NativeEventBridge {
 
     /**
      * An event raised by the frontend, addressed by [ordinal].
@@ -11,6 +11,7 @@ object Events {
      * deserializer reads it from index zero.
      */
     @JvmStatic
+    @Suppress("unused") // <--- invoked by rust
     fun eventReceived(ordinal: Int, payload: ByteArray) {
         application.eventsHandler.dispatch(ordinal, payload, source = EventSource.JAVASCRIPT)
     }

@@ -1,10 +1,10 @@
-package revxrsal.kitsune.test
+package revxrsal.kitsune
 
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
-import revxrsal.kitsune.annotation.ExportEvent
-import revxrsal.kitsune.annotation.ExportFunction
-import revxrsal.kitsune.annotation.Listener
+import revxrsal.kitsune.event.ExportEvent
+import revxrsal.kitsune.functions.ExportFunction
+import revxrsal.kitsune.event.Listener
 import kotlin.time.Duration.Companion.milliseconds
 
 /** No arguments: the generated wrapper decodes nothing. */
@@ -42,15 +42,11 @@ object Greeter {
     fun greet(name: String = "world"): String = "hello, $name"
 }
 
-/** Returns Unit: the wrapper replies with zero bytes. */
 @ExportFunction
 fun log(message: String = "ping", level: Int = 1) {
     println("[$level] $message")
 }
 
-// --- suspending exports ----------------------------------------------------
-
-/** Suspending, no defaults: called directly from the suspending wrapper. */
 @ExportFunction
 suspend fun fetch(url: String): String {
     delay(10.milliseconds)

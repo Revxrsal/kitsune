@@ -1,4 +1,4 @@
-package revxrsal.kitsune.annotation
+package revxrsal.kitsune.event
 
 /**
  * Marks a class the Rust host can emit into the Kotlin side.

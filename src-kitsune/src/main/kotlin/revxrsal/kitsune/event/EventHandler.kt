@@ -1,10 +1,11 @@
-package revxrsal.kitsune.ipc
+package revxrsal.kitsune.event
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
-import revxrsal.kitsune.app.Events
+import revxrsal.kitsune.ipc.KitsuneCbor
+import revxrsal.kitsune.coroutines.KitsuneScope
 
 /**
  * The exported event types of this module and the listeners registered on them.
@@ -77,7 +78,7 @@ class EventHandler(
             )
         }
         if (source == EventSource.KOTLIN) {
-            Events.kotlinEmittedEvent(ordinal, payload)
+            NativeEventBridge.kotlinEmittedEvent(ordinal, payload)
         }
 
         val plain = listeners[ordinal]

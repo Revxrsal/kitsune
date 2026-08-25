@@ -1,4 +1,4 @@
-package revxrsal.kitsune.annotation
+package revxrsal.kitsune.event
 
 /**
  * Handles an event emitted by the Rust host.

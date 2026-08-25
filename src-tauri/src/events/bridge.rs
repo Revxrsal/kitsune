@@ -5,7 +5,7 @@ use jni::sys::{jboolean, jbyte, jint};
 use jni::{Env, bind_java_type, refs::LoaderContext};
 
 bind_java_type! {
-    pub Events => revxrsal.kitsune.app.Events,
+    pub Events => revxrsal.kitsune.event.NativeEventBridge,
     methods {
         static fn event_received(id: jint, payload: jbyte[]),
     },

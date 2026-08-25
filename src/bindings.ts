@@ -20,7 +20,7 @@ export type Unlisten = () => void
 
 // ---- types --------------------------------------------------------------------
 
-/** `revxrsal.kitsune.test.ButtonClicked` */
+/** `revxrsal.kitsune.ButtonClicked` */
 export interface ButtonClicked {
   x: number
   y: number
@@ -28,109 +28,109 @@ export interface ButtonClicked {
 
 // ---- functions ----------------------------------------------------------------
 
-/** `revxrsal.kitsune.test.add` */
+/** `revxrsal.kitsune.add` */
 export interface Args_add {
   a: number
   b: number
 }
 
-/** `revxrsal.kitsune.test.add` */
+/** `revxrsal.kitsune.add` */
 export function add(args: Args_add): Promise<number> {
   return Bridge.call(0, args)
 }
 
-/** `revxrsal.kitsune.test.fetch` */
+/** `revxrsal.kitsune.fetch` */
 export interface Args_fetch {
   url: string
 }
 
-/** `revxrsal.kitsune.test.fetch` */
+/** `revxrsal.kitsune.fetch` */
 export function fetch(args: Args_fetch): Promise<string> {
   return Bridge.call(1, args)
 }
 
-/** `revxrsal.kitsune.test.Greeter.greet` */
+/** `revxrsal.kitsune.Greeter.greet` */
 export interface Args_greet {
   name?: string
 }
 
-/** `revxrsal.kitsune.test.Greeter.greet` */
+/** `revxrsal.kitsune.Greeter.greet` */
 export function greet(args: Args_greet = {}): Promise<string> {
   return Bridge.call(2, args)
 }
 
-/** `revxrsal.kitsune.test.label` */
+/** `revxrsal.kitsune.label` */
 export interface Args_label {
   text?: string | null
 }
 
-/** `revxrsal.kitsune.test.label` */
+/** `revxrsal.kitsune.label` */
 export function label(args: Args_label = {}): Promise<string> {
   return Bridge.call(3, args)
 }
 
-/** `revxrsal.kitsune.test.Store.load` */
+/** `revxrsal.kitsune.Store.load` */
 export interface Args_load {
   key?: string
   limit?: number
 }
 
-/** `revxrsal.kitsune.test.Store.load` */
+/** `revxrsal.kitsune.Store.load` */
 export function load(args: Args_load = {}): Promise<string> {
   return Bridge.call(4, args)
 }
 
-/** `revxrsal.kitsune.test.log` */
+/** `revxrsal.kitsune.log` */
 export interface Args_log {
   message?: string
   level?: number
 }
 
-/** `revxrsal.kitsune.test.log` */
+/** `revxrsal.kitsune.log` */
 export function log(args: Args_log = {}): Promise<void> {
   return Bridge.call(5, args)
 }
 
-/** `revxrsal.kitsune.test.poll` */
+/** `revxrsal.kitsune.poll` */
 export interface Args_poll {
   source?: string
   attempts?: number
 }
 
-/** `revxrsal.kitsune.test.poll` */
+/** `revxrsal.kitsune.poll` */
 export function poll(args: Args_poll = {}): Promise<string> {
   return Bridge.call(6, args)
 }
 
-/** `revxrsal.kitsune.test.reverse` */
+/** `revxrsal.kitsune.reverse` */
 export interface Args_reverse {
   input?: string
   times?: number
 }
 
-/** `revxrsal.kitsune.test.reverse` */
+/** `revxrsal.kitsune.reverse` */
 export function reverse(args: Args_reverse = {}): Promise<string> {
   return Bridge.call(7, args)
 }
 
-/** `revxrsal.kitsune.test.version` */
+/** `revxrsal.kitsune.version` */
 export function version(): Promise<string> {
   return Bridge.call(8, {})
 }
 
-/** `revxrsal.kitsune.test.warm` */
+/** `revxrsal.kitsune.warm` */
 export interface Args_warm {
   target?: string
 }
 
-/** `revxrsal.kitsune.test.warm` */
+/** `revxrsal.kitsune.warm` */
 export function warm(args: Args_warm = {}): Promise<void> {
   return Bridge.call(9, args)
 }
 
 // ---- events -------------------------------------------------------------------
 
-/** `revxrsal.kitsune.test.ButtonClicked` */
+/** `revxrsal.kitsune.ButtonClicked` */
 export const ButtonClicked = {
   /** The ordinal this event travels under, on both sides of the bridge. */
   ordinal: 0,

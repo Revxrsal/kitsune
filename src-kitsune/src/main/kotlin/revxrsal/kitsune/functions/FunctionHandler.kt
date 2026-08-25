@@ -1,6 +1,7 @@
-package revxrsal.kitsune.ipc
+package revxrsal.kitsune.functions
 
 import kotlinx.coroutines.*
+import revxrsal.kitsune.coroutines.KitsuneScope
 
 /**
  * One exported function, in whichever of the two shapes it was declared.
