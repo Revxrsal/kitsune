@@ -6,11 +6,16 @@ import com.google.devtools.ksp.symbol.KSNode
 import revxrsal.kitsune.codegen.functions.ExportedFun
 import revxrsal.kitsune.codegen.functions.argumentsSerialName
 
-/** An `@ExportFunction`, paired with the name the bridge dispatches it under. */
-class BoundFunction(val exportedName: String, val function: ExportedFun)
+/**
+ * An `@ExportFunction`, paired with the ordinal the bridge dispatches it under.
+ *
+ * [exportedName] is no longer on the wire — the ordinal replaced it — but it is
+ * still what the binding is *called*, and what a diagnostic names.
+ */
+class BoundFunction(val ordinal: Int, val exportedName: String, val function: ExportedFun)
 
-/** An `@ExportEvent` class, paired with the id it travels under. */
-class BoundEvent(val id: String, val declaration: KSClassDeclaration)
+/** An `@ExportEvent` class, paired with the ordinal it travels under. */
+class BoundEvent(val ordinal: Int, val id: String, val declaration: KSClassDeclaration)
 
 /**
  * Words TypeScript will not accept as a declaration name.
@@ -57,9 +62,10 @@ fun renderBindings(
     val sections = mutableListOf(HEADER)
 
     // Conditional because the frontend compiles with `noUnusedLocals`: an
-    // unused `Bridge` import in a module that exports no functions is not a
-    // warning there, it is a build failure.
-    if (renderedFunctions.isNotEmpty()) {
+    // unused `Bridge` import in a module that exports nothing is not a warning
+    // there, it is a build failure. Events reach for it too — `emit` and
+    // `listen` are forwards to the bridge, same as a function call.
+    if (renderedFunctions.isNotEmpty() || renderedEvents.isNotEmpty()) {
         sections += "import {Bridge} from '$bridgeImport'"
     }
     if (renderedEvents.isNotEmpty()) {
@@ -91,6 +97,12 @@ private val HEADER = """
     // Kotlin declaration gives a default, and leaving it out is what makes that
     // default apply. Passing `undefined` explicitly is not the same thing — the
     // key still reaches the decoder — so omit it rather than spelling it out.
+    //
+    // The numbers below are wire ordinals: the index the Kotlin side looks the
+    // export up at, written into the head of the payload instead of a name. They
+    // are assigned by sorting the exported names, so adding an export renumbers
+    // the ones after it — which is harmless only because both halves are
+    // regenerated together. Never hand-write one.
 """.trimIndent()
 
 private fun banner(title: String): String =
@@ -99,8 +111,8 @@ private fun banner(title: String): String =
 /**
  * One exported function: its argument object, and the call that forwards to it.
  *
- * The wrapper is a plain forward to [Bridge.call] with the exported name baked
- * in — the encoding, the transport and the reply all belong to the bridge, and
+ * The wrapper is a plain forward to [Bridge.call] with the ordinal baked in —
+ * the encoding, the transport and the reply all belong to the bridge, and
  * duplicating any of it per function would be one more place for the two sides
  * to drift.
  */
@@ -114,11 +126,12 @@ private fun renderFunction(bound: BoundFunction, types: TsTypes, logger: KSPLogg
         ?: "void"
 
     val documentation = "/** `${function.qualifiedName}` */"
+    val ordinal = bound.ordinal
     if (function.parameters.isEmpty()) {
         return """
             |$documentation
             |export function $name(): Promise<$returns> {
-            |  return Bridge.call('$name', {})
+            |  return Bridge.call($ordinal, {})
             |}
         """.trimMargin()
     }
@@ -144,7 +157,7 @@ private fun renderFunction(bound: BoundFunction, types: TsTypes, logger: KSPLogg
         |
         |$documentation
         |export function $name(args: $argumentsType$default): Promise<$returns> {
-        |  return Bridge.call('$name', args)
+        |  return Bridge.call($ordinal, args)
         |}
     """.trimMargin()
 }
@@ -157,11 +170,9 @@ private fun renderFunction(bound: BoundFunction, types: TsTypes, logger: KSPLogg
  * which is what lets `ButtonClicked` be both the thing you describe a handler
  * with and the thing you call `.listen` on.
  *
- * Both implementations are stubs. The transport for events does not exist yet on
- * either side of the bridge: `EventHandler.dispatch` is reachable only from the
- * Rust host, and nothing emits Kotlin-side events outward at all. Generating the
- * shape now fixes the API the runtime has to grow into, and a `throw` is the
- * only honest body until it does.
+ * Both directions are plain forwards to the bridge with the ordinal baked in,
+ * exactly as a function binding is. The id comes along for diagnostics only:
+ * nothing dispatches on it any more.
  */
 private fun renderEvent(bound: BoundEvent, types: TsTypes, logger: KSPLogger): String? {
     val payload = types.typeOf(bound.declaration.asStarProjectedType(), bound.declaration)
@@ -174,20 +185,18 @@ private fun renderEvent(bound: BoundEvent, types: TsTypes, logger: KSPLogger): S
     return """
         |/** `$qualifiedName` */
         |export const $name = {
-        |  /** The id this event travels under, on both sides of the bridge. */
+        |  /** The ordinal this event travels under, on both sides of the bridge. */
+        |  ordinal: ${bound.ordinal},
+        |
+        |  /** The id it was declared with. Diagnostics only — the wire carries the ordinal. */
         |  id: '${bound.id}',
         |
         |  /** Sends the event to Kotlin, where every `@Listener` for it runs. */
-        |  emit: async (event: $payload): Promise<void> => {
-        |    void event
-        |    throw new Error("emit('${bound.id}') is not implemented yet")
-        |  },
+        |  emit: (event: $payload): Promise<void> => Bridge.emit(${bound.ordinal}, event),
         |
-        |  /** Subscribes to the event; await the result, then call it to stop. */
-        |  listen: async (handler: (event: $payload) => void): Promise<Unlisten> => {
-        |    void handler
-        |    throw new Error("listen('${bound.id}') is not implemented yet")
-        |  },
+        |  /** Subscribes to the event; call the result to stop. */
+        |  listen: (handler: (event: $payload) => void): Unlisten =>
+        |    Bridge.listen(${bound.ordinal}, handler as (event: unknown) => void),
         |}
     """.trimMargin()
 }

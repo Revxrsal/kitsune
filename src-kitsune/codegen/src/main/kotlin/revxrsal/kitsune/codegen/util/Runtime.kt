@@ -16,6 +16,13 @@ object Runtime {
 
     const val IPC_PACKAGE = "revxrsal.kitsune.ipc"
 
+    /**
+     * Base class of every entry point. Constructing one is what installs the
+     * `application` singleton the bridge dispatches through, which is why the
+     * generated Rust calls a constructor and nothing else.
+     */
+    const val APPLICATION = "revxrsal.kitsune.app.KitsuneApplication"
+
     /** The configured `Cbor` instance both sides of the bridge encode with. */
     val Codec = MemberName(IPC_PACKAGE, "KitsuneCbor")
 

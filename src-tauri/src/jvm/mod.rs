@@ -1,4 +1,5 @@
 mod dist;
+pub mod entrypoint;
 
 #[cfg(embedded_runtime)]
 mod bundle;

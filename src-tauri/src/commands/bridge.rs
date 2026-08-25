@@ -1,5 +1,5 @@
 use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::jlong;
+use jni::sys::{jint, jlong};
 use jni::{Env, JavaVM, bind_java_type, refs::LoaderContext};
 use parking_lot::Mutex;
 use rustc_hash::FxHasher;
@@ -16,7 +16,7 @@ static PENDING: Mutex<FxMap> = Mutex::new(HashMap::with_hasher(BuildHasherDefaul
 bind_java_type! {
     pub Bridge => revxrsal.kitsune.app.Bridge,
     methods {
-        static fn submit(id: jlong, name: JString, request: jbyte[]),
+        static fn submit(id: jlong, ordinal: jint, request: jbyte[]),
         static fn cancel(id: jlong),
     },
     native_methods {
@@ -71,7 +71,13 @@ impl Drop for Guard {
     }
 }
 
-pub async fn call_kotlin(name: &str, body: &[u8]) -> KotlinResult {
+/// Hands `body` to the Kotlin export at `ordinal` and awaits its reply.
+///
+/// `ordinal` rather than a name: it is already an `i32` by the time it gets here,
+/// so nothing is allocated on the way in — where a name meant a `NewStringUTF`
+/// per call, and a hash lookup on the other side, to identify a function the
+/// build had already numbered.
+pub async fn call_kotlin(ordinal: jint, body: &[u8]) -> KotlinResult {
     let (tx, rx) = oneshot::channel::<KotlinResult>();
     let id = COUNTER.fetch_add(1, Relaxed);
     PENDING.lock().insert(id, tx);
@@ -79,9 +85,8 @@ pub async fn call_kotlin(name: &str, body: &[u8]) -> KotlinResult {
 
     let vm = JavaVM::singleton().map_err(|e| e.to_string())?;
     vm.attach_current_thread(|env| -> Result<(), jni::errors::Error> {
-        let jname = env.new_string(name)?;
         let payload = env.byte_array_from_slice(body)?;
-        Bridge::submit(env, id as jlong, &jname, &payload)
+        Bridge::submit(env, id as jlong, ordinal, &payload)
     })
     .map_err(|e| e.to_string())?;
 

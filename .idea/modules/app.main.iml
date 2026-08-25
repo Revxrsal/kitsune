@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module external.linked.project.id="app:main" external.linked.project.path="$MODULE_DIR$/../../app" external.root.project.path="$MODULE_DIR$/../../app" external.system.id="GRADLE" external.system.module.group="revxrsal" external.system.module.type="sourceSet" external.system.module.version="1.0" type="JAVA_MODULE" version="4">
+<module external.linked.project.id="app:main" external.linked.project.path="$MODULE_DIR$/../../src-kitsune" external.root.project.path="$MODULE_DIR$/../../src-kitsune" external.system.id="GRADLE" external.system.module.group="revxrsal" external.system.module.type="sourceSet" external.system.module.version="1.0" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet external-system-id="GRADLE" type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../app/build/generated/ksp/main/java;/home/ali/Rust/kitsune/app/src/main/kotlin;/home/ali/Rust/kitsune/app/src/test/kotlin;/home/ali/Rust/kitsune/app/build/generated/ksp/test/kotlin;/home/ali/Rust/kitsune/app/build/generated/ksp/main/kotlin;/home/ali/Rust/kitsune/app/build/generated/ksp/test/java">
+      <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../src-kitsune/src/main/kotlin;/home/ali/Rust/kitsune/src-kitsune/src/test/kotlin;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/test/java;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/main/kotlin;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/main/java;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/test/kotlin">
         <compilerSettings />
         <compilerArguments>
           <flagArguments>
@@ -11,7 +11,7 @@
             <flagArg name="noStdlib" arg="true" />
           </flagArguments>
           <stringArguments>
-            <stringArg name="destination" arg="$MODULE_DIR$/../../app/build/classes/kotlin/main" />
+            <stringArg name="destination" arg="$MODULE_DIR$/../../src-kitsune/build/classes/kotlin/main" />
             <stringArg name="jvmTarget" arg="25" />
             <stringArg name="moduleName" arg="revxrsal:app" />
             <stringArg name="apiVersion" arg="2.4" />
@@ -35,15 +35,15 @@
     </facet>
   </component>
   <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_25">
-    <output url="file://$MODULE_DIR$/../../app/build/classes/kotlin/main" />
+    <output url="file://$MODULE_DIR$/../../src-kitsune/build/classes/kotlin/main" />
     <exclude-output />
-    <content url="file://$MODULE_DIR$/../../app/build/generated/ksp/main/java" />
-    <content url="file://$MODULE_DIR$/../../app/build/generated/ksp/main/kotlin">
-      <sourceFolder url="file://$MODULE_DIR$/../../app/build/generated/ksp/main/kotlin" isTestSource="false" />
+    <content url="file://$MODULE_DIR$/../../src-kitsune/build/generated/ksp/main/java" />
+    <content url="file://$MODULE_DIR$/../../src-kitsune/build/generated/ksp/main/kotlin">
+      <sourceFolder url="file://$MODULE_DIR$/../../src-kitsune/build/generated/ksp/main/kotlin" isTestSource="false" />
     </content>
-    <content url="file://$MODULE_DIR$/../../app/src/main">
-      <sourceFolder url="file://$MODULE_DIR$/../../app/src/main/kotlin" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/../../app/src/main/resources" type="java-resource" />
+    <content url="file://$MODULE_DIR$/../../src-kitsune/src/main">
+      <sourceFolder url="file://$MODULE_DIR$/../../src-kitsune/src/main/kotlin" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../../src-kitsune/src/main/resources" type="java-resource" />
     </content>
     <orderEntry type="jdk" jdkName="temurin-25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />

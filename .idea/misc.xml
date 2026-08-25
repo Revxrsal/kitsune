@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="EntryPointsManager">
+    <list size="2">
+      <item index="0" class="java.lang.String" itemvalue="revxrsal.kitsune.annotation.KitsuneEntrypoint" />
+      <item index="1" class="java.lang.String" itemvalue="revxrsal.kitsune.annotation.Listener" />
+    </list>
+  </component>
   <component name="FrameworkDetectionExcludesConfiguration">
-    <file type="web" url="file://$PROJECT_DIR$/app" />
-  </component>
-  <component name="GithubDefaultAccount">
-    <option name="defaultAccountId" value="dd4f13fa-e119-4dab-9fc7-3e9b337224b7" />
-  </component>
-  <component name="ProjectRootManager" version="2">
-    <output url="file://$PROJECT_DIR$/out" />
+    <file type="web" url="file://$PROJECT_DIR$/src-kitsune" />
   </component>
 </project>

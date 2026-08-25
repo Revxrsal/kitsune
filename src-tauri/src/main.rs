@@ -1,8 +1,6 @@
 use jni::JavaVM;
-use kitsune_app_lib::{bridge, events};
+use kitsune_app_lib::{commands, events, jvm};
 use std::time::Duration;
-
-mod jvm;
 
 fn main() -> anyhow::Result<()> {
     let dist = jvm::JavaDist::locate()?;
@@ -12,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     // `rustComplete`. Every later call reuses the cache.
     let vm = JavaVM::singleton()?;
     vm.attach_current_thread(|env| -> Result<(), jni::errors::Error> {
-        bridge::init(env)?;
+        commands::bridge::init(env)?;
         events::bridge::init(env)?;
         Ok(())
     })?;
@@ -24,8 +22,12 @@ fn main() -> anyhow::Result<()> {
         .on_thread_start(|| {
             // permanent attachment; lasts for the life of the worker
             let vm = JavaVM::singleton().unwrap();
-            vm.attach_current_thread(|_env| -> Result<(), jni::errors::Error> { Ok(()) })
-                .unwrap();
+            vm.attach_current_thread(|env| -> Result<(), jni::errors::Error> {
+                commands::bridge::init(env)?;
+                events::bridge::init(env)?;
+                Ok(())
+            })
+            .unwrap();
         })
         .enable_all()
         .build()?;

@@ -4,7 +4,7 @@ import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.KSAnnotated
 
 /**
- * Fully-qualified names of the three Kitsune annotations, and readers for their
+ * Fully-qualified names of the Kitsune annotations, and readers for their
  * arguments.
  *
  * These are strings rather than `KClass` references on purpose. Kono's codegen
@@ -26,6 +26,7 @@ object Annotations {
     const val EXPORT_FUNCTION = "$PACKAGE.ExportFunction"
     const val EXPORT_EVENT = "$PACKAGE.ExportEvent"
     const val LISTENER = "$PACKAGE.Listener"
+    const val ENTRYPOINT = "$PACKAGE.KitsuneEntrypoint"
 }
 
 /** Package name reserved for generated code; user code may not live in it. */

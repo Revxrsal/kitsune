@@ -1,4 +1,11 @@
-package revxrsal.kitsune
+package revxrsal.kitsune.test
 
-class TestApplication {
+import revxrsal.kitsune.annotation.KitsuneEntrypoint
+import revxrsal.kitsune.app.KitsuneApplication
+
+@KitsuneEntrypoint
+object TestApplication : KitsuneApplication() {
+    init {
+        println("Application initialized from an object!")
+    }
 }

@@ -1,3 +1,5 @@
+package revxrsal.kitsune.test
+
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import revxrsal.kitsune.annotation.ExportEvent

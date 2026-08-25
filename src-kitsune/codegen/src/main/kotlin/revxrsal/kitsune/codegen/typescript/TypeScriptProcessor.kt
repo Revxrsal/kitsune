@@ -14,9 +14,11 @@ import com.google.devtools.ksp.symbol.KSNode
 import revxrsal.kitsune.codegen.functions.ExportedFun
 import revxrsal.kitsune.codegen.functions.checkExportable
 import revxrsal.kitsune.codegen.util.Annotations
+import revxrsal.kitsune.codegen.util.assignOrdinals
 import revxrsal.kitsune.codegen.util.isReservedPackageName
 import revxrsal.kitsune.codegen.util.stringArgument
 import revxrsal.kitsune.codegen.util.symbolsAnnotatedWith
+import revxrsal.kitsune.codegen.util.writeIfChanged
 import java.io.File
 
 /** Discovered by KSP through `META-INF/services`; must be public with a no-arg constructor. */
@@ -50,6 +52,14 @@ private const val DEFAULT_BRIDGE_IMPORT = "./Bridge"
  * `EventProcessor` have already reported them against the same symbols and
  * failed the build; repeating each message under a second processor would double
  * every error in the log and point at the same line twice.
+ *
+ * ## Ordinals
+ *
+ * The bindings dispatch by ordinal, so this processor has to hand out the same
+ * numbers `FunctionProcessor` and `EventProcessor` do — and it cannot ask them,
+ * for the same reason it cannot share their output. `assignOrdinals` is the
+ * shared rule that makes three independent walks agree; see its documentation
+ * for why it is a sort rather than discovery order.
  *
  * ## Where the file goes
  *
@@ -90,13 +100,18 @@ class TypeScriptProcessor(
 
         val functions = collectFunctions(resolver)
         val events = collectEvents(resolver)
-        write(File(path), renderBindings(functions, events, bridgeImport, logger))
+        writeIfChanged(
+            file = File(path),
+            contents = renderBindings(functions, events, bridgeImport, logger),
+            logger = logger,
+            what = "TypeScript bindings",
+        )
         return emptyList()
     }
 
     @OptIn(KspExperimental::class)
     private fun collectFunctions(resolver: Resolver): List<BoundFunction> {
-        val bound = LinkedHashMap<String, BoundFunction>()
+        val bound = LinkedHashMap<String, ExportedFun>()
 
         for (symbol in resolver.symbolsAnnotatedWith(Annotations.EXPORT_FUNCTION)) {
             val declaration = symbol as? KSFunctionDeclaration ?: continue
@@ -115,13 +130,15 @@ class TypeScriptProcessor(
                 ?: function.name
             // First wins, matching the registry: a duplicate name is an error
             // FunctionProcessor has already raised.
-            bound.putIfAbsent(name, BoundFunction(name, function))
+            bound.putIfAbsent(name, function)
         }
-        return bound.values.toList()
+        return assignOrdinals(bound.keys).mapIndexed { ordinal, name ->
+            BoundFunction(ordinal, name, bound.getValue(name))
+        }
     }
 
     private fun collectEvents(resolver: Resolver): List<BoundEvent> {
-        val bound = LinkedHashMap<String, BoundEvent>()
+        val bound = LinkedHashMap<String, KSClassDeclaration>()
 
         for (symbol in resolver.symbolsAnnotatedWith(Annotations.EXPORT_EVENT)) {
             val declaration = symbol as? KSClassDeclaration ?: continue
@@ -130,23 +147,11 @@ class TypeScriptProcessor(
 
             val id = declaration.stringArgument(Annotations.EXPORT_EVENT, "id")
                 ?: declaration.simpleName.asString()
-            bound.putIfAbsent(id, BoundEvent(id, declaration))
+            bound.putIfAbsent(id, declaration)
         }
-        return bound.values.toList()
-    }
-
-    /**
-     * Writes [contents] to [file], and only when they differ from what is there.
-     *
-     * The frontend dev server watches this file. Rewriting identical bytes on
-     * every Gradle build would reload the app each time, so the comparison is
-     * what keeps a Kotlin-only change from being visible in the browser.
-     */
-    private fun write(file: File, contents: String) {
-        file.parentFile?.mkdirs()
-        if (file.isFile && file.readText() == contents) return
-        file.writeText(contents)
-        logger.info("Kitsune: wrote TypeScript bindings to $file")
+        return assignOrdinals(bound.keys).mapIndexed { ordinal, id ->
+            BoundEvent(ordinal, id, bound.getValue(id))
+        }
     }
 }
 

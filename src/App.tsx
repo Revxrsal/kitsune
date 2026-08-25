@@ -1,21 +1,17 @@
 import {useState} from "react";
 import reactLogo from "./assets/react.svg";
-import {invoke} from "@tauri-apps/api/core";
 import "./App.css";
-import {Kitsune} from "./Kitsune.ts";
-
+import {reverse} from "./bindings.ts";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
+  const [button, setButton] = useState("Greet")
 
   async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    Kitsune.call("reverse", {
-      name: "help"
+    const result = await reverse({
+      input: name,
     })
-    await invoke('call_kt', bytes, {headers: {'x-fn': 'fetchOrders'}})
-    setGreetMsg(await invoke("greet", {name}));
+    setButton(result)
   }
 
   return (
@@ -47,9 +43,8 @@ function App() {
           onChange={(e) => setName(e.currentTarget.value)}
           placeholder="Enter a name..."
         />
-        <button type="submit">Greet</button>
+        <button type="submit">{button}</button>
       </form>
-      <p>{greetMsg}</p>
     </main>
   );
 }

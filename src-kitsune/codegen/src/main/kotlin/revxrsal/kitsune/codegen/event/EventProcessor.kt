@@ -19,7 +19,9 @@ import com.squareup.kotlinpoet.ksp.toClassName
 import revxrsal.kitsune.codegen.functions.ExportedFun
 import revxrsal.kitsune.codegen.functions.checkExportable
 import revxrsal.kitsune.codegen.util.Annotations
+import revxrsal.kitsune.codegen.util.ORDINAL_LIMIT
 import revxrsal.kitsune.codegen.util.RESERVED_PACKAGE
+import revxrsal.kitsune.codegen.util.assignOrdinals
 import revxrsal.kitsune.codegen.util.hasAnnotation
 import revxrsal.kitsune.codegen.util.isReservedPackageName
 import revxrsal.kitsune.codegen.util.stringArgument
@@ -64,6 +66,16 @@ class EventProcessor(
             events += event
         }
 
+        // The wire carries the ordinal as a u16. Past that the prefix wraps and
+        // an event lands on whatever shares the low sixteen bits.
+        if (events.size > ORDINAL_LIMIT) {
+            logger.error(
+                "Too many @ExportEvent declarations: ${events.size} exceeds the $ORDINAL_LIMIT " +
+                    "the wire ordinal can address."
+            )
+        }
+
+        val knownIds = idsByQualifiedName.values.toSet()
         val listeners = mutableListOf<RegisteredListener>()
 
         for (symbol in resolver.symbolsAnnotatedWith(Annotations.LISTENER)) {
@@ -71,10 +83,10 @@ class EventProcessor(
                 logger.error("@Listener is only applicable to functions.", symbol)
                 continue
             }
-            listeners += parseListener(symbol, resolver, idsByQualifiedName) ?: continue
+            listeners += parseListener(symbol, resolver, idsByQualifiedName, knownIds) ?: continue
         }
 
-        writeEventsFile(codeGenerator, events, listeners)
+        writeEventsFile(codeGenerator, events.inOrdinalOrder(), listeners)
         return emptyList()
     }
 
@@ -146,6 +158,7 @@ class EventProcessor(
         declaration: KSFunctionDeclaration,
         resolver: Resolver,
         idsByQualifiedName: Map<String, String>,
+        knownIds: Set<String>,
     ): RegisteredListener? {
         if (!declaration.isPublic()) {
             logger.error("@Listener functions must be public.", declaration)
@@ -190,6 +203,19 @@ class EventProcessor(
                 return null
             }
 
+        // Only reachable through an explicit @Listener(event = ...): the fallback
+        // above reads the id off a registered event, so it cannot miss. It is an
+        // error rather than a silently dead listener because the tables are
+        // indexed by ordinal now — an id with no event behind it has no row to
+        // live in, so there is nowhere to put it even in principle.
+        if (id !in knownIds) {
+            logger.error(
+                "No @ExportEvent is registered under id '$id'. Known: ${knownIds.sorted()}.",
+                declaration,
+            )
+            return null
+        }
+
         return RegisteredListener(
             function = function,
             eventType = eventDeclaration.toClassName(),
@@ -200,4 +226,17 @@ class EventProcessor(
     private companion object {
         const val SERIALIZABLE_ANNOTATION = "kotlinx.serialization.Serializable"
     }
+}
+
+/**
+ * Orders the events by ordinal — index in the returned list *is* the ordinal.
+ *
+ * [assignOrdinals] is what decides the order, and it is deliberately blind to
+ * the order this processor discovered them in: `TypeScriptProcessor` walks the
+ * same annotations separately, and the two have to arrive at the same numbering
+ * without being able to see each other.
+ */
+private fun List<ExportedEvent>.inOrdinalOrder(): List<ExportedEvent> {
+    val byId = associateBy { it.id }
+    return assignOrdinals(byId.keys).map(byId::getValue)
 }

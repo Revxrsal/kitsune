@@ -42,6 +42,15 @@ tasks.shadowJar {
 }
 
 kitsune {
+    // Generated TypeScript for every export, written into the frontend's source
+    // tree next to Bridge.ts — which is what makes the default ./Bridge import
+    // resolve, and why bridgeImport is left alone here.
+    bindings.set(layout.projectDirectory.file("../src/bindings.ts"))
+
+    // The Rust host's handover into Kotlin, generated from whichever class
+    // carries @KitsuneEntrypoint. Overwritten on every build that moves it.
+    entrypoint.set(layout.projectDirectory.file("../src-tauri/src/jvm/entrypoint.rs"))
+
     // Not MainKt: the training run has no Rust host attached, so it must not
     // invoke Bridge's external funs. See Training.kt.
     trainingMainClass.set("revxrsal.kitsune.Training")
@@ -69,4 +78,19 @@ kitsune {
             "--enable-native-access=ALL-UNNAMED",
         )
     )
+}
+
+// A KSP processor is configured only through processor options, so what the
+// kitsune { } block above says about bindings is forwarded to TypeScriptProcessor
+// here. Both are passed as providers: the block is evaluated after this one, and
+// `arg(key, Provider)` defers the read until KSP actually runs, so the order the
+// two appear in this file does not decide what the processor sees.
+//
+// The empty fallback is how "generate nothing" is expressed. A MapProperty entry
+// backed by a provider with no value fails the build when KSP reads its options,
+// which would make an unset `bindings` an error rather than the opt-out it is.
+ksp {
+    arg("kitsune.bindings", kitsune.bindings.map { it.asFile.absolutePath }.orElse(""))
+    arg("kitsune.bridgeImport", kitsune.bridgeImport)
+    arg("kitsune.entrypoint", kitsune.entrypoint.map { it.asFile.absolutePath }.orElse(""))
 }

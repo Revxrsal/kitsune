@@ -33,25 +33,44 @@ sealed interface ExportedFunction {
 }
 
 /**
- * The exported functions of this module, keyed by the name the host dispatches
- * with.
+ * The exported functions of this module, indexed by the **ordinal** the host
+ * dispatches with — the number the payload carries in its first two bytes.
  *
- * Construct it from `GeneratedFunctions.handler()` rather than by hand — the map
- * it wraps is written by the KSP processor from the `@ExportFunction`
- * declarations, and a hand-built one silently diverges.
+ * Construct it from `GeneratedFunctions.handler()` rather than by hand — the
+ * arrays it wraps are written by the KSP processor from the `@ExportFunction`
+ * declarations, and a hand-built pair silently diverges. [exportedNames] is
+ * parallel to [functions] and exists only so a bad ordinal can be reported in
+ * terms a person recognises; nothing dispatches on it.
  */
 class FunctionHandler(
-    private val functions: Map<String, ExportedFunction>,
+    private val functions: Array<ExportedFunction>,
+    private val exportedNames: Array<String>,
     private val scope: CoroutineScope = KitsuneScope,
 ) {
 
-    /** Every exported name, for diagnostics and for the host to validate against. */
-    val names: Set<String> get() = functions.keys
+    init {
+        require(functions.size == exportedNames.size) {
+            "Function tables disagree on how many exports there are: " +
+                "${functions.size} functions, ${exportedNames.size} names"
+        }
+    }
 
-    operator fun contains(name: String): Boolean = name in functions
+    /** Every exported name, in ordinal order, for diagnostics. */
+    val names: List<String> get() = exportedNames.asList()
 
-    /** Whether [name] was declared `suspend`, and so cannot go through [call]. */
-    fun isSuspending(name: String): Boolean = resolve(name) is ExportedFunction.Suspending
+    /**
+     * The ordinal [name] is exported under, or `-1`.
+     *
+     * A binary search rather than a map: the names are sorted, because sorting
+     * them is how the ordinals were handed out in the first place.
+     */
+    fun ordinalOf(name: String): Int =
+        exportedNames.binarySearch(name).let { if (it < 0) -1 else it }
+
+    operator fun contains(name: String): Boolean = ordinalOf(name) >= 0
+
+    /** Whether the export at [ordinal] was declared `suspend`, and so cannot go through [call]. */
+    fun isSuspending(ordinal: Int): Boolean = resolve(ordinal) is ExportedFunction.Suspending
 
     /**
      * Invokes a non-suspending export on the calling thread and returns its
@@ -62,10 +81,11 @@ class FunctionHandler(
      * coroutine that may be waiting for the network is a decision the caller has
      * to make knowingly. [callBlocking] and [launchCall] are the two ways to make it.
      */
-    fun call(name: String, request: ByteArray): ByteArray = when (val function = resolve(name)) {
+    fun call(ordinal: Int, request: ByteArray): ByteArray = when (val function = resolve(ordinal)) {
         is ExportedFunction.Blocking -> function(request)
         is ExportedFunction.Suspending -> throw IllegalStateException(
-            "'$name' is a suspend function; use callBlocking() or launchCall() instead of call()."
+            "'${exportedNames[ordinal]}' is a suspend function; use callBlocking() or " +
+                "launchCall() instead of call()."
         )
     }
 
@@ -76,8 +96,8 @@ class FunctionHandler(
      * synchronous and has nowhere to deliver a later result. It is not a
      * substitute for [launchCall] once the protocol grows a reply channel.
      */
-    fun callBlocking(name: String, request: ByteArray): ByteArray =
-        when (val function = resolve(name)) {
+    fun callBlocking(ordinal: Int, request: ByteArray): ByteArray =
+        when (val function = resolve(ordinal)) {
             is ExportedFunction.Blocking -> function(request)
             // Deliberately not `runBlocking(scope.coroutineContext)`: that would
             // dispatch the body onto Dispatchers.Default and block this thread
@@ -98,13 +118,13 @@ class FunctionHandler(
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     fun launchCall(
-        name: String,
+        ordinal: Int,
         request: ByteArray,
         onComplete: (Result<ByteArray>) -> Unit,
     ): Job {
         val d = scope.async {
             try {
-                val f = resolve(name)
+                val f = resolve(ordinal)
                 Result.success(
                     when (f) {
                     is ExportedFunction.Blocking -> withContext(Dispatchers.IO) { f(request) }
@@ -131,12 +151,23 @@ class FunctionHandler(
     }
 
     /**
-     * An unknown name is an error rather than an empty reply: the host and this
-     * module are built from the same source tree, so it means they have drifted,
-     * and the caller is owed that rather than a plausible-looking empty response.
+     * An out-of-range ordinal is an error rather than an empty reply: the host
+     * and this module are built from the same source tree, so it means they have
+     * drifted, and the caller is owed that rather than a plausible-looking empty
+     * response.
+     *
+     * The check is explicit rather than left to the array, because
+     * `ArrayIndexOutOfBoundsException` crossing the bridge says nothing about
+     * what went wrong — and drift is exactly the case where the message has to
+     * carry the diagnosis.
      */
-    private fun resolve(name: String): ExportedFunction = functions[name]
-        ?: throw NoSuchElementException(
-            "No exported function named '$name'. Known: ${names.sorted()}"
-        )
+    private fun resolve(ordinal: Int): ExportedFunction {
+        if (ordinal < 0 || ordinal >= functions.size) {
+            throw NoSuchElementException(
+                "No exported function at ordinal $ordinal. Known: ${functions.size} functions, " +
+                    "${exportedNames.asList()}"
+            )
+        }
+        return functions[ordinal]
+    }
 }

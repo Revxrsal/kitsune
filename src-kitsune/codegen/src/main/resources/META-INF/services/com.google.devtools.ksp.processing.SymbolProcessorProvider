@@ -1,2 +1,4 @@
 revxrsal.kitsune.codegen.functions.FunctionProcessorProvider
 revxrsal.kitsune.codegen.event.EventProcessorProvider
+revxrsal.kitsune.codegen.typescript.TypeScriptProcessorProvider
+revxrsal.kitsune.codegen.rust.EntrypointProcessorProvider

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module external.linked.project.id=":codegen:test" external.linked.project.path="$MODULE_DIR$/../../../app/codegen" external.root.project.path="$MODULE_DIR$/../../../app" external.system.id="GRADLE" external.system.module.group="app" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
+<module external.linked.project.id=":codegen:test" external.linked.project.path="$MODULE_DIR$/../../../src-kitsune/codegen" external.root.project.path="$MODULE_DIR$/../../../src-kitsune" external.system.id="GRADLE" external.system.module.group="app" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet external-system-id="GRADLE" type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../../app/codegen/src/main/kotlin;/home/ali/Rust/kitsune/app/codegen/src/test/kotlin">
+      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../../src-kitsune/codegen/src/test/kotlin;/home/ali/Rust/kitsune/src-kitsune/codegen/src/main/kotlin">
         <additionalVisibleModuleNames>:codegen:main</additionalVisibleModuleNames>
         <compilerSettings>
           <option name="additionalArguments" value="-Xjdk-release=21" />
@@ -14,7 +14,7 @@
             <flagArg name="noStdlib" arg="true" />
           </flagArguments>
           <stringArguments>
-            <stringArg name="destination" arg="$MODULE_DIR$/../../../app/codegen/build/classes/kotlin/test" />
+            <stringArg name="destination" arg="$MODULE_DIR$/../../../src-kitsune/codegen/build/classes/kotlin/test" />
             <stringArg name="jvmTarget" arg="21" />
             <stringArg name="moduleName" arg="app:codegen_test" />
             <stringArg name="apiVersion" arg="2.4" />
@@ -36,9 +36,9 @@
     </facet>
   </component>
   <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_21">
-    <output-test url="file://$MODULE_DIR$/../../../app/codegen/build/classes/java/test" />
+    <output-test url="file://$MODULE_DIR$/../../../src-kitsune/codegen/build/classes/java/test" />
     <exclude-output />
-    <content url="file://$MODULE_DIR$/../../../app/codegen/src/test" />
+    <content url="file://$MODULE_DIR$/../../../src-kitsune/codegen/src/test" />
     <orderEntry type="jdk" jdkName="temurin-25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="app.codegen.main" />

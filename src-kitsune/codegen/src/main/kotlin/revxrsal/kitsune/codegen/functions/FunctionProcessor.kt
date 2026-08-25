@@ -11,7 +11,9 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import revxrsal.kitsune.codegen.util.Annotations
+import revxrsal.kitsune.codegen.util.ORDINAL_LIMIT
 import revxrsal.kitsune.codegen.util.RESERVED_PACKAGE
+import revxrsal.kitsune.codegen.util.assignOrdinals
 import revxrsal.kitsune.codegen.util.isReservedPackageName
 import revxrsal.kitsune.codegen.util.stringArgument
 import revxrsal.kitsune.codegen.util.symbolsAnnotatedWith
@@ -100,7 +102,27 @@ class FunctionProcessor(
             )
         }
 
-        writeFunctionsFile(codeGenerator, exported)
+        // The wire carries the ordinal as a u16. Past that the prefix wraps and
+        // a call lands on whatever function shares the low sixteen bits.
+        if (exported.size > ORDINAL_LIMIT) {
+            logger.error(
+                "Too many @ExportFunction declarations: ${exported.size} exceeds the $ORDINAL_LIMIT " +
+                    "the wire ordinal can address."
+            )
+        }
+
+        writeFunctionsFile(codeGenerator, exported.inOrdinalOrder())
         return emptyList()
     }
 }
+
+/**
+ * Orders the exports by ordinal — index in the returned list *is* the ordinal.
+ *
+ * [assignOrdinals] is what decides the order, and it is deliberately blind to
+ * the order this processor discovered them in: `TypeScriptProcessor` walks the
+ * same annotations separately, and the two have to arrive at the same numbering
+ * without being able to see each other.
+ */
+private fun Map<String, ExportedFun>.inOrdinalOrder(): List<ExportedEntry> =
+    assignOrdinals(keys).map { ExportedEntry(it, getValue(it)) }

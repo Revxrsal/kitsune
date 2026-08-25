@@ -3,81 +3,94 @@ package revxrsal.kitsune.ipc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.DeserializationStrategy
+import kotlinx.serialization.ExperimentalSerializationApi
+import revxrsal.kitsune.app.Events
 
 /**
  * The exported event types of this module and the listeners registered on them.
  *
  * Build it with `GeneratedEvents.handler()`; the KSP processor fills it from the
  * `@ExportEvent` and `@Listener` declarations.
+ *
+ * Everything is a flat array indexed by the event's **ordinal**, which is what
+ * the payload carries in its first two bytes — so dispatch costs a bounds check
+ * and two loads, and no part of the frame has to be decoded to find out where it
+ * goes. The four arrays are parallel: index *i* is the same event in all of them,
+ * which the generator guarantees by building them in one pass.
+ *
+ * [ids] is here for diagnostics, and for [ordinalOf]. Nothing dispatches on it.
  */
-class EventHandler(private val scope: CoroutineScope = KitsuneScope) {
+class EventHandler(
+    private val ids: Array<String>,
+    private val deserializers: Array<DeserializationStrategy<*>>,
+    private val listeners: Array<Array<(Any) -> Unit>>,
+    private val suspendingListeners: Array<Array<suspend (Any) -> Unit>>,
+    private val scope: CoroutineScope = KitsuneScope,
+) {
 
-    private val deserializers = HashMap<String, DeserializationStrategy<*>>()
-    private val blocking = HashMap<String, MutableList<(Any) -> Unit>>()
-    private val suspending = HashMap<String, MutableList<suspend (Any) -> Unit>>()
-
-    /** Every registered event id. */
-    val events: Set<String> get() = deserializers.keys
-
-    /**
-     * Registers the payload type the host sends under [id].
-     *
-     * [T] is unused at runtime but is what ties the [deserializer] to the type
-     * the matching [listener] call will receive, so the two cannot disagree
-     * without the generated file failing to compile.
-     */
-    fun <T : Any> addEvent(id: String, deserializer: DeserializationStrategy<T>) {
-        require(deserializers.put(id, deserializer) == null) {
-            "An event is already registered under id '$id'"
+    init {
+        require(
+            ids.size == deserializers.size &&
+                ids.size == listeners.size &&
+                ids.size == suspendingListeners.size
+        ) {
+            "Event tables disagree on how many events there are: ${ids.size} ids, " +
+                "${deserializers.size} deserializers, ${listeners.size} listener rows, " +
+                "${suspendingListeners.size} suspending listener rows"
         }
     }
 
-    /**
-     * Registers a callback for the event [id].
-     *
-     * Several listeners may share an id; they run in registration order, which
-     * is declaration order in the generated file.
-     */
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> listener(id: String, block: (T) -> Unit) {
-        blocking.getOrPut(id) { mutableListOf() } += block as (Any) -> Unit
-    }
+    /** Every registered event id, in ordinal order. */
+    val events: List<String> get() = ids.asList()
 
     /**
-     * Registers a `suspend` callback for the event [id].
+     * The ordinal [id] travels under, or `-1`.
      *
-     * Unlike a plain [listener] it does not run during [dispatch]; it is launched
-     * into this handler's scope and outlives the call. `dispatch` therefore
-     * cannot report its failure, which is what the scope's exception handler is
-     * for.
+     * A binary search rather than a map: the ids are sorted, because sorting
+     * them is how the ordinals were handed out in the first place. For a table
+     * this size the search beats hashing, and it costs no extra structure at all.
      */
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> suspendingListener(id: String, block: suspend (T) -> Unit) {
-        suspending.getOrPut(id) { mutableListOf() } += block as suspend (Any) -> Unit
-    }
+    fun ordinalOf(id: String): Int = ids.binarySearch(id).let { if (it < 0) -1 else it }
 
     /**
-     * Decodes [payload] as the event registered under [id], runs every plain
+     * Decodes [payload] as the event registered at [ordinal], runs every plain
      * listener on it, and launches every suspending one.
      *
      * Decoding happens once even when several listeners are attached, and not at
-     * all when none are — an event nothing listens for costs only the map lookup.
+     * all when none are — an event nothing listens for costs only the bounds
+     * check.
      *
      * Each suspending listener gets its own coroutine rather than sharing one:
      * they are independent, so neither should be able to delay the next or, under
      * [KitsuneScope]'s supervisor job, cancel it by failing.
+     *
+     * An event this side raised is forwarded outward first, before any local
+     * listener runs. The forward is what the other half of the app is waiting on,
+     * and a listener here — which may be slow, and may throw — has no business
+     * sitting in front of it.
      */
-    fun dispatch(id: String, payload: ByteArray) {
-        val deserializer = deserializers[id]
-            ?: throw NoSuchElementException(
-                "No exported event with id '$id'. Known: ${events.sorted()}"
+    @OptIn(ExperimentalSerializationApi::class)
+    fun dispatch(ordinal: Int, payload: ByteArray, source: EventSource = EventSource.KOTLIN) {
+        if (ordinal < 0 || ordinal >= ids.size) {
+            throw NoSuchElementException(
+                "No exported event at ordinal $ordinal. Known: ${ids.size} events, ${ids.asList()}"
             )
-        val plain = blocking[id].orEmpty()
-        val launched = suspending[id].orEmpty()
+        }
+        if (source == EventSource.KOTLIN) {
+            Events.kotlinEmittedEvent(ordinal, payload)
+        }
+
+        val plain = listeners[ordinal]
+        val launched = suspendingListeners[ordinal]
         if (plain.isEmpty() && launched.isEmpty()) return
 
-        val event = KitsuneCbor.decodeFromByteArray(deserializer, payload) as Any
+        val event = KitsuneCbor.decodeFromByteArray(deserializers[ordinal], payload) as Any
         for (handler in plain) handler(event)
         for (handler in launched) scope.launch { handler(event) }
     }
+}
+
+enum class EventSource {
+    KOTLIN,
+    JAVASCRIPT
 }

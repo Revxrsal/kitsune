@@ -4,6 +4,5 @@
     <inspection_tool class="JSXNamespaceValidation" enabled="true" level="INFORMATION" enabled_by_default="true">
       <option name="requiredNamespace" value="" />
     </inspection_tool>
-    <inspection_tool class="KotlinPrintToLogpoint" enabled="false" level="DEBUGGER_SUGGESTION" enabled_by_default="false" />
   </profile>
 </component>

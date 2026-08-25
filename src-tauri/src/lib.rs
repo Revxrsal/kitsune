@@ -1,24 +1,30 @@
-use crate::bridge::call_kotlin;
+use crate::commands::call_kt;
+use crate::events::{dispatch_event, register_events_pump};
+use jni::{JavaVM};
+use crate::jvm::entrypoint;
 
-mod bridge;
-
-#[tauri::command]
-async fn call_kt(req: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
-    let name = req.headers().get("x-fn").and_then(|v| v.to_str().ok())
-        .ok_or("missing x-fn header")?.to_string();
-    let body = match req.body() {
-        tauri::ipc::InvokeBody::Raw(v) => v.clone(),
-        _ => return Err("expected raw body".into()),
-    };
-    let bytes = call_kotlin(&name, &body).await?;   // oneshot + CancelGuard
-    Ok(tauri::ipc::Response::new(bytes))
-}
+pub mod jvm;
+pub mod commands;
+pub mod events;
+pub mod wire;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub async fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![call_kt])
+        .invoke_handler(tauri::generate_handler![
+            call_kt,
+            register_events_pump,
+            dispatch_event
+        ])
+        .setup(|_| {
+            let vm = JavaVM::singleton()?;
+            vm.attach_current_thread(|env| -> anyhow::Result<()> {
+                entrypoint::enter_app(env)?;
+                Ok(())
+            })?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

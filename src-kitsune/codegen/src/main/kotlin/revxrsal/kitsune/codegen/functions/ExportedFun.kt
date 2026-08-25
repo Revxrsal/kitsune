@@ -23,8 +23,13 @@ import com.squareup.kotlinpoet.joinToCode
 import com.squareup.kotlinpoet.ksp.addOriginatingKSFile
 import com.squareup.kotlinpoet.ksp.toClassName
 import com.squareup.kotlinpoet.ksp.toTypeName
+import revxrsal.kitsune.codegen.util.BuildClassSerialDescriptor
+import revxrsal.kitsune.codegen.util.CompositeDecoderClass
 import revxrsal.kitsune.codegen.util.ContinuationClass
+import revxrsal.kitsune.codegen.util.DecodeStructure
+import revxrsal.kitsune.codegen.util.DecoderClass
 import revxrsal.kitsune.codegen.util.DefaultConstructorMarkerType
+import revxrsal.kitsune.codegen.util.DeserializationStrategyClass
 import revxrsal.kitsune.codegen.util.INT_TYPE_BLOCK
 import revxrsal.kitsune.codegen.util.JavaObjectType
 import revxrsal.kitsune.codegen.util.LambdaMetafactoryClass
@@ -33,16 +38,19 @@ import revxrsal.kitsune.codegen.util.MethodHandlesClass
 import revxrsal.kitsune.codegen.util.MethodTypeClass
 import revxrsal.kitsune.codegen.util.RESERVED_PACKAGE
 import revxrsal.kitsune.codegen.util.Runtime
-import revxrsal.kitsune.codegen.util.SERIALIZABLE
-import revxrsal.kitsune.codegen.util.SerializerFunction
+import revxrsal.kitsune.codegen.util.SerialDescriptorClass
+import revxrsal.kitsune.codegen.util.SerializationExceptionClass
+import revxrsal.kitsune.codegen.util.SerializerCache
 import revxrsal.kitsune.codegen.util.SuspendIntrinsic
 import revxrsal.kitsune.codegen.util.addComment
 import revxrsal.kitsune.codegen.util.asReturnTypeBlock
 import revxrsal.kitsune.codegen.util.enclosingObject
-import revxrsal.kitsune.codegen.util.primaryConstructor
 
-/** The local the decoded argument holder is bound to in generated code. */
-private const val HOLDER = "args"
+/** The local the argument decoder is bound to in generated code. */
+private const val DECODER = "args"
+
+/** The `descriptor` override every decoder carries; reserved before parameters are named. */
+private const val DESCRIPTOR = "descriptor"
 
 /**
  * An `@ExportFunction` (or `@Listener`) declaration, with everything the
@@ -97,8 +105,17 @@ val ExportedFun.callSite: CodeBlock
     get() = owner?.let { CodeBlock.of("%T.%L", it.toClassName(), name) }
         ?: CodeBlock.of("%L", qualifiedName)
 
-/** The `@Serializable` holder carrying this function's arguments over the bridge. */
-val ExportedFun.holderClassName get() = "Args_$name"
+/**
+ * The serial name of this function's argument descriptor.
+ *
+ * Only ever seen in a `SerializationException` message — there is no class by
+ * this name any more — so it is named after the shape it describes rather than
+ * after the wrapper.
+ */
+val ExportedFun.argumentsSerialName get() = "Args_$name"
+
+/** The `private val` holding this function's argument descriptor. */
+private val ExportedFun.descriptorProperty get() = "`descriptor\$$name`"
 
 /** The functional interface the synthetic `$default` method is bound to. */
 private val ExportedFun.syntheticInterface
@@ -142,25 +159,15 @@ fun ExportedFun.checkExportable(logger: KSPLogger, annotation: String): Boolean 
         if (parameter.isVararg) {
             reject("$annotation does not support vararg parameters.")
         }
-        // See ExportedParameter.holderType: absence and an explicit null decode
-        // to the same thing, so the two readings must agree on what to do.
-        if (parameter.hasDefault && parameter.isNullable) {
-            logger.warn(
-                "Parameter '${parameter.name}' of $annotation function '$name' is both nullable " +
-                    "and defaulted. An explicit null from the host is indistinguishable from an " +
-                    "omitted argument, so the declared default is used for both.",
-                function,
-            )
-        }
     }
     return ok
 }
 
 /**
- * Writes this function's argument holder, default-binding machinery and wrapper
- * into the aggregated functions file.
+ * Writes this function's argument descriptor and decoder, its default-binding
+ * machinery and its wrapper into the aggregated functions file.
  */
-fun ExportedFun.addTo(file: FileSpec.Builder) {
+fun ExportedFun.addTo(file: FileSpec.Builder, serializers: SerializerCache) {
     val wrapper = FunSpec.builder(name)
         .addOriginatingKSFile(function.containingFile!!)
         .addParameter("request", ByteArray::class)
@@ -173,78 +180,222 @@ fun ExportedFun.addTo(file: FileSpec.Builder) {
 
     // No arguments: nothing to decode, nothing to mask.
     if (!takesArgs) {
-        callDirectly(code)
+        callDirectly(code, emptyMap(), serializers = serializers)
         file.addFunction(wrapper.addCode(code.build()).build())
         return
     }
 
-    file.addType(createHolderClass())
-    code.addStatement(
-        "val %L = %M.decodeFromByteArray(%M<%L>(), request)",
-        HOLDER,
-        Runtime.Codec,
-        SerializerFunction,
-        holderClassName,
-    )
-
-    // Every argument is mandatory, so the direct call always applies.
-    if (!hasDefaultParameters) {
-        callDirectly(code)
-        file.addFunction(wrapper.addCode(code.build()).build())
-        return
-    }
-
-    // The mask locals and the synthetic interface's parameters share their names
-    // with the declared parameters, so both are allocated from one namespace —
-    // otherwise a parameter called `mask0` or `marker` collides with the
-    // machinery generated around it.
+    // Everything generated around the parameters shares their namespace, so all
+    // of it is allocated from one allocator — otherwise a parameter called
+    // `mask0` or `marker` collides with the machinery built around it.
+    //
+    // `descriptor` is reserved first because it is the one name that cannot
+    // move: it is the `DeserializationStrategy` member the decoder overrides. A
+    // parameter of that name is renamed to `descriptor_` on the decoder and goes
+    // on carrying its declared name on the wire and at the call site.
     val names = NameAllocator()
-    parameters.forEach { names.newName(it.name) }
-    names.newName(HOLDER)
+    names.newName(DESCRIPTOR)
+    val fields = parameters.associateWith { names.newName(it.name, it) }
+    val decoderName = names.newName(DECODER)
     val masker = Masker(count = parameters.size, nameAllocator = names)
+    val decoderParameter = names.newName("decoder")
+    val indexName = names.newName("index")
     val receiverName = names.newName("receiver")
     val markerName = names.newName("marker")
     val continuationName = names.newName("continuation")
 
+    file.addProperty(createDescriptorProperty())
+    code.add(
+        "val %L = %L\n",
+        decoderName,
+        createDecoder(masker, fields, decoderParameter, indexName, serializers),
+    )
+    code.addStatement("%M.decodeFromByteArray(%L, request)", Runtime.Codec, decoderName)
+    checkRequiredArguments(code, masker, decoderName)
+
+    // Every argument is mandatory, so the direct call always applies.
+    if (!hasDefaultParameters) {
+        callDirectly(code, fields, decoderName, serializers)
+        file.addFunction(wrapper.addCode(code.build()).build())
+        return
+    }
+
     file.addType(createSyntheticInterface(masker, receiverName, markerName, continuationName))
     file.addProperty(createSyntheticProperty(masker))
 
-    masker.declare(code)
-    computeMask(code, masker)
-
-    code.beginControlFlow("if (%L)", masker.allArgumentsSupplied())
+    code.beginControlFlow("if (%L)", masker.allArgumentsSupplied("$decoderName."))
     code.addComment("Every defaulted parameter was supplied; skip the synthetic method.")
-    callDirectly(code)
+    callDirectly(code, fields, decoderName, serializers)
     code.endControlFlow()
 
-    callThroughSynthetic(code, masker, continuationName)
+    callThroughSynthetic(code, masker, fields, decoderName, continuationName, serializers)
     file.addFunction(wrapper.addCode(code.build()).build())
 }
 
 /**
- * Clears one mask bit per supplied argument.
+ * Rejects a payload that left out a parameter with no default.
  *
- * The walk covers *every* parameter, not just the defaulted ones, because bit
- * positions are parameter positions — skipping a mandatory parameter would shift
- * every subsequent bit and silently substitute the wrong defaults.
+ * The check exists because it is no longer free. A plugin-generated
+ * `@Serializable` decoder raises `MissingFieldException` for a required property
+ * on its own; a hand-written one is handed the element indices the payload
+ * carried and nothing else, so the same guarantee has to be spelled out — and
+ * without it `add(a: Int, b: Int)` would answer `{a: 1}` with `b = 0` rather
+ * than an error.
+ *
+ * It runs before the mask is consulted for anything else, which is what lets
+ * [Masker.allArgumentsSupplied] keep meaning "every *defaulted* parameter was
+ * supplied" even though mandatory parameters clear bits too: by this point
+ * theirs are known to be clear.
  */
-private fun ExportedFun.computeMask(code: CodeBlock.Builder, masker: Masker) {
-    for (parameter in parameters) {
-        if (parameter.hasDefault) {
-            code.beginControlFlow("if (%L.%L != null)", HOLDER, parameter.name)
-            masker.clearCurrentBit(code)
-            code.endControlFlow()
+private fun ExportedFun.checkRequiredArguments(
+    code: CodeBlock.Builder,
+    masker: Masker,
+    decoderName: String,
+) {
+    val required = parameters.withIndex().filter { (_, parameter) -> !parameter.hasDefault }
+    if (required.isEmpty()) return
+
+    // One `and` per mask on the happy path, however many parameters it covers.
+    val condition = masker.requiredBits(required.map { it.index })
+        .map { (maskName, bits) ->
+            CodeBlock.of("%L.%L·and·0x%L.toInt()·!= 0", decoderName, maskName, Integer.toHexString(bits))
         }
-        masker.advance()
+        .joinToCode("·|| ")
+
+    code.beginControlFlow("if (%L)", condition)
+    code.beginControlFlow("val missing = buildList")
+    for ((index, parameter) in required) {
+        code.addStatement(
+            "if (%L.%L and 0x%L.toInt() != 0) add(%S)",
+            decoderName,
+            masker.maskNameOf(index),
+            Integer.toHexString(masker.bitOf(index)),
+            parameter.name,
+        )
     }
+    code.endControlFlow()
+    code.addStatement(
+        "throw %T(%P)",
+        SerializationExceptionClass,
+        "Missing required argument(s) \$missing for '$name'.",
+    )
+    code.endControlFlow()
+}
+
+/**
+ * The decoder for this function's arguments.
+ *
+ * Hand-written rather than left to `@Serializable`, for the one thing the
+ * plugin-generated decoder cannot report: *which keys the payload carried*. It
+ * yields a value per property, and an absent key and an explicit null both
+ * arrive as `null` — so a parameter that is nullable and defaulted has no way to
+ * tell "use the default" from "the host really means null". `decodeElementIndex`
+ * visits only the keys that were actually present, so the mask falls out of the
+ * decode that was happening anyway, exact and free.
+ *
+ * An anonymous object rather than a named class, with the decoded values as
+ * fields on it rather than as captured locals. Captured `var`s would each be
+ * boxed into a `Ref` — one allocation per parameter, per call, on top of the
+ * decoder — whereas fields make it a single object the wrapper reads straight
+ * out of. It is also why nothing here is a `KSerializer`: only [deserialize] is
+ * ever reached, and `Unit` is the honest return type for a decoder that writes
+ * its results into itself.
+ */
+private fun ExportedFun.createDecoder(
+    masker: Masker,
+    fields: Map<ExportedParameter, String>,
+    decoderParameter: String,
+    indexName: String,
+    serializers: SerializerCache,
+): TypeSpec {
+    val body = buildCodeBlock {
+        beginControlFlow("%L.%M(%L)", decoderParameter, DecodeStructure, DESCRIPTOR)
+        beginControlFlow("while (true)")
+        beginControlFlow("when (val %L = decodeElementIndex(%L))", indexName, DESCRIPTOR)
+        for ((index, parameter) in parameters.withIndex()) {
+            beginControlFlow("%L ->", index)
+            addStatement(
+                "%L·= %L",
+                fields.getValue(parameter),
+                parameter.readElement(index, name, serializers.nameFor(parameter.fieldType)),
+            )
+            masker.clearBit(this, index)
+            endControlFlow()
+        }
+        addStatement("%T.DECODE_DONE -> break", CompositeDecoderClass)
+        // Unreachable in practice: an unknown key is skipped rather than
+        // reported, because KitsuneCbor is configured with ignoreUnknownKeys.
+        addStatement(
+            "else -> throw %T(%P)",
+            SerializationExceptionClass,
+            "Unexpected element index \$$indexName while decoding '$name'.",
+        )
+        endControlFlow()
+        endControlFlow()
+        endControlFlow()
+    }
+
+    return TypeSpec.anonymousClassBuilder()
+        .addSuperinterface(DeserializationStrategyClass.parameterizedBy(UNIT))
+        .addProperties(parameters.map { it.toDecoderField(fields.getValue(it)) })
+        .addProperties(masker.fields())
+        .addProperty(
+            PropertySpec.builder(DESCRIPTOR, SerialDescriptorClass, KModifier.OVERRIDE)
+                .getter(
+                    FunSpec.getterBuilder()
+                        .addStatement("return %L", descriptorProperty)
+                        .build()
+                )
+                .build()
+        )
+        .addFunction(
+            FunSpec.builder("deserialize")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter(decoderParameter, DecoderClass)
+                .addCode(body)
+                .build()
+        )
+        .build()
+}
+
+/**
+ * The descriptor naming this function's arguments, in declaration order.
+ *
+ * At file scope and `lazy` for the same reason as the synthetic binding: a
+ * function that is never called never builds one, and nothing runs during class
+ * initialisation, which matters for a module whose classes are linked ahead of
+ * time by the AOT training pass.
+ *
+ * Element order is what the mask is indexed by — element *i* is parameter *i* —
+ * so it must follow the declaration and not, say, the alphabet.
+ */
+private fun ExportedFun.createDescriptorProperty(): PropertySpec {
+    val descriptor = buildCodeBlock {
+        beginControlFlow("lazy")
+        beginControlFlow("%M(%S)", BuildClassSerialDescriptor, argumentsSerialName)
+        for (parameter in parameters) {
+            addStatement("%L", parameter.toDescriptorElement())
+        }
+        endControlFlow()
+        endControlFlow()
+    }
+    return PropertySpec.builder(descriptorProperty, SerialDescriptorClass, KModifier.PRIVATE)
+        .addKdoc("The arguments of `%L`, as the host sends them.\n", qualifiedName)
+        .delegate(descriptor)
+        .build()
 }
 
 /** Calls the real function by name, with every argument named. */
-private fun ExportedFun.callDirectly(code: CodeBlock.Builder) {
+private fun ExportedFun.callDirectly(
+    code: CodeBlock.Builder,
+    fields: Map<ExportedParameter, String>,
+    decoderName: String = DECODER,
+    serializers: SerializerCache,
+) {
     val arguments = parameters
-        .map { CodeBlock.of("%L·=·%L", it.name, it.directAccess(HOLDER)) }
+        .map { CodeBlock.of("%L·=·%L", it.name, it.directAccess(decoderName, fields.getValue(it))) }
         .joinToCode(", ")
-    code.emitResult(this, CodeBlock.of("%L(%L)", callSite, arguments))
+    code.emitResult(this, CodeBlock.of("%L(%L)", callSite, arguments), serializers)
 }
 
 /**
@@ -262,25 +413,28 @@ private fun ExportedFun.callDirectly(code: CodeBlock.Builder) {
 private fun ExportedFun.callThroughSynthetic(
     code: CodeBlock.Builder,
     masker: Masker,
+    fields: Map<ExportedParameter, String>,
+    decoderName: String,
     continuationName: String,
+    serializers: SerializerCache,
 ) {
     val arguments = buildList {
         // A member of an object compiles to a static synthetic taking the
         // instance as its first argument.
         owner?.let { add(CodeBlock.of("%T", it.toClassName())) }
-        parameters.mapTo(this) { it.syntheticAccess(HOLDER) }
+        parameters.mapTo(this) { it.syntheticAccess(decoderName, fields.getValue(it)) }
         // The compiler appends the continuation after the declared parameters
         // and before the masks. It is not a declared parameter, so it consumes
         // no mask bit.
         if (isSuspend) add(CodeBlock.of("%L", continuationName))
-        add(masker.asArguments())
+        add(masker.asArguments("$decoderName."))
         add(CodeBlock.of("%M", Runtime.DefaultConstructorMarker))
     }.joinToCode(", ")
 
     code.addComment("Some arguments were omitted; let the compiler's synthetic method fill them in.")
 
     if (!isSuspend) {
-        code.emitResult(this, CodeBlock.of("%L.invoke(%L)", syntheticProperty, arguments))
+        code.emitResult(this, CodeBlock.of("%L.invoke(%L)", syntheticProperty, arguments), serializers)
         return
     }
 
@@ -294,7 +448,7 @@ private fun ExportedFun.callThroughSynthetic(
     )
     code.addStatement("%L.invoke(%L)", syntheticProperty, arguments)
     code.endControlFlow()
-    code.emitEncodedReturn(this)
+    code.emitEncodedReturn(this, serializers)
 }
 
 /**
@@ -305,25 +459,34 @@ private fun ExportedFun.callThroughSynthetic(
  * It also must not be bound to a local — a `Unit`-typed `val result` is an
  * unused-variable warning in every generated wrapper that has one.
  */
-private fun CodeBlock.Builder.emitResult(function: ExportedFun, call: CodeBlock) {
+private fun CodeBlock.Builder.emitResult(
+    function: ExportedFun,
+    call: CodeBlock,
+    serializers: SerializerCache,
+) {
     if (function.returnType == UNIT) {
         addStatement("%L", call)
     } else {
         addStatement("val result = %L", call)
     }
-    emitEncodedReturn(function)
+    emitEncodedReturn(function, serializers)
 }
 
 /** Returns `result`, encoded — or zero bytes when there is nothing to encode. */
-private fun CodeBlock.Builder.emitEncodedReturn(function: ExportedFun) {
+private fun CodeBlock.Builder.emitEncodedReturn(
+    function: ExportedFun,
+    serializers: SerializerCache,
+) {
     if (function.returnType == UNIT) {
         addStatement("return ByteArray(0)")
     } else {
+        // Cached for the same reason the element serializers are: a return type
+        // that is not a plain builtin — `List<String>`, a nullable — resolves to
+        // a constructor call, and inline it would run on every reply.
         addStatement(
-            "return %M.encodeToByteArray(%M<%T>(), result)",
+            "return %M.encodeToByteArray(%L, result)",
             Runtime.Codec,
-            SerializerFunction,
-            function.returnType,
+            serializers.nameFor(function.returnType),
         )
     }
 }
@@ -441,11 +604,3 @@ private fun ExportedFun.createSyntheticProperty(masker: Masker): PropertySpec {
         .delegate(code)
         .build()
 }
-
-/** The `@Serializable` class the host's argument payload decodes into. */
-private fun ExportedFun.createHolderClass(): TypeSpec =
-    TypeSpec.classBuilder(holderClassName)
-        .addAnnotation(SERIALIZABLE)
-        .addOriginatingKSFile(function.containingFile!!)
-        .primaryConstructor(parameters.map { it.toHolderParameter() })
-        .build()

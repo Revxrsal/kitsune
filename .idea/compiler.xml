@@ -11,6 +11,10 @@
       <module name="app.codegen.test" target="21" />
       <module name="app.main" target="25" />
       <module name="app.test" target="25" />
+      <module name="buildSrc.app.buildSrc.main" target="21" />
+      <module name="buildSrc.app.buildSrc.test" target="21" />
+      <module name="codegen.app.codegen.main" target="21" />
+      <module name="codegen.app.codegen.test" target="21" />
     </bytecodeTargetLevel>
   </component>
 </project>

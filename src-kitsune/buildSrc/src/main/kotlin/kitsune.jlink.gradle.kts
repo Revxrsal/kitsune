@@ -12,6 +12,9 @@ plugins {
 
 val kitsune = extensions.create<KitsuneExtension>("kitsune").apply {
     compression.convention("zip-9")
+    // Right whenever the bindings file sits next to Bridge.ts, which is where a
+    // frontend that did not say otherwise will have put it.
+    bridgeImport.convention("./Bridge")
     // Files the host never reaches: it loads libjvm.so directly rather than
     // shelling out to a JDK tool, and the AOT cache replaces CDS.
     //   keytool   - a JDK tool; nothing launches it

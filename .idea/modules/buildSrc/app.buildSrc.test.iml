@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<module external.linked.project.id=":buildSrc:test" external.linked.project.path="$MODULE_DIR$/../../../app/buildSrc" external.root.project.path="$MODULE_DIR$/../../../app" external.system.id="GRADLE" external.system.module.group="" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
+<module external.linked.project.id=":buildSrc:test" external.linked.project.path="$MODULE_DIR$/../../../src-kitsune/buildSrc" external.root.project.path="$MODULE_DIR$/../../../src-kitsune" external.system.id="GRADLE" external.system.module.group="" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet external-system-id="GRADLE" type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../../app/buildSrc/build/generated-sources/kotlin-dsl-accessors/kotlin;/home/ali/Rust/kitsune/app/buildSrc/src/main/kotlin;/home/ali/Rust/kitsune/app/buildSrc/src/test/kotlin;/home/ali/Rust/kitsune/app/buildSrc/build/generated-sources/kotlin-dsl-external-plugin-spec-builders/kotlin;/home/ali/Rust/kitsune/app/buildSrc/build/generated-sources/kotlin-dsl-plugins/kotlin">
+      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../../src-kitsune/buildSrc/build/generated-sources/kotlin-dsl-plugins/kotlin;/home/ali/Rust/kitsune/src-kitsune/buildSrc/build/generated-sources/kotlin-dsl-accessors/kotlin;/home/ali/Rust/kitsune/src-kitsune/buildSrc/src/main/kotlin;/home/ali/Rust/kitsune/src-kitsune/buildSrc/build/generated-sources/kotlin-dsl-external-plugin-spec-builders/kotlin;/home/ali/Rust/kitsune/src-kitsune/buildSrc/src/test/kotlin">
         <additionalVisibleModuleNames>:buildSrc:main</additionalVisibleModuleNames>
         <compilerSettings>
           <option name="additionalArguments" value="-java-parameters -Xjspecify-annotations=strict -Xjsr305=strict -jvm-default no-compatibility -Xsam-conversions=class -Xuse-fir-lt=false" />
@@ -14,7 +14,7 @@
             <flagArg name="noStdlib" arg="true" />
           </flagArguments>
           <stringArguments>
-            <stringArg name="destination" arg="$MODULE_DIR$/../../../app/buildSrc/build/classes/kotlin/test" />
+            <stringArg name="destination" arg="$MODULE_DIR$/../../../src-kitsune/buildSrc/build/classes/kotlin/test" />
             <stringArg name="jvmTarget" arg="21" />
             <stringArg name="moduleName" arg="buildSrc_test" />
             <stringArg name="apiVersion" arg="2.2" />
@@ -62,9 +62,9 @@
     </facet>
   </component>
   <component name="NewModuleRootManager" LANGUAGE_LEVEL="JDK_21">
-    <output-test url="file://$MODULE_DIR$/../../../app/buildSrc/build/classes/java/test" />
+    <output-test url="file://$MODULE_DIR$/../../../src-kitsune/buildSrc/build/classes/java/test" />
     <exclude-output />
-    <content url="file://$MODULE_DIR$/../../../app/buildSrc/src/test" />
+    <content url="file://$MODULE_DIR$/../../../src-kitsune/buildSrc/src/test" />
     <orderEntry type="jdk" jdkName="21" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="app.buildSrc.main" />
@@ -254,7 +254,7 @@
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="file://$MODULE_DIR$/../../../app/buildSrc/build/pluginUnderTestMetadata" />
+          <root url="file://$MODULE_DIR$/../../../src-kitsune/buildSrc/build/pluginUnderTestMetadata" />
         </CLASSES>
         <JAVADOC />
         <SOURCES />

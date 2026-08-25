@@ -1,11 +1,54 @@
 package kitsune
 
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 
-/** Configuration for the `kitsune.jlink` convention plugin. */
+/**
+ * Configuration for the `kitsune.jlink` convention plugin, and for the KSP
+ * processors that write the frontend's bindings and the Rust host's entrypoint.
+ *
+ * Those settings are declared here rather than in a `ksp { }` block so
+ * that everything about "how this module becomes an app" is configured in one
+ * place. The convention plugin does not read them — the root build passes them
+ * on to KSP as processor options, which is the only channel a processor has.
+ */
 abstract class KitsuneExtension {
+
+    /**
+     * The TypeScript file the codegen writes bindings for every
+     * `@ExportFunction` and `@ExportEvent` into.
+     *
+     * It lives outside this Gradle project, in the frontend's source tree, and
+     * is overwritten in place on every build that changes the exported surface —
+     * so point it at a generated file and check it in only as one.
+     *
+     * Left unset, no bindings are generated at all.
+     */
+    abstract val bindings: RegularFileProperty
+
+    /**
+     * Module specifier the generated file imports `Bridge` from, resolved
+     * relative to [bindings] itself.
+     *
+     * Defaults to `./Bridge`, which is right whenever the two files are
+     * siblings.
+     */
+    abstract val bridgeImport: Property<String>
+
+    /**
+     * The Rust file the codegen writes the `@KitsuneEntrypoint` handover into.
+     *
+     * Like [bindings], it lives outside this Gradle project — in the Rust host's
+     * source tree — and is overwritten in place whenever the annotated class
+     * moves or is renamed. The host names that class as a JNI string, so this is
+     * what keeps the string and the Kotlin declaration from drifting apart.
+     *
+     * Left unset, no entrypoint is generated, and a module with no
+     * `@KitsuneEntrypoint` class is not an error.
+     */
+    abstract val entrypoint: RegularFileProperty
 
     /**
      * VM flags shared by the AOT training runs and the host process that calls

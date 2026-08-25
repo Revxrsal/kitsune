@@ -3,6 +3,7 @@ package revxrsal.kitsune.codegen.util
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.INT
 import com.squareup.kotlinpoet.NameAllocator
+import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.joinToCode
 
 /** `Int::class.javaPrimitiveType` — the type of each mask parameter. */
@@ -33,6 +34,12 @@ val DefaultConstructorMarkerType: CodeBlock = JavaObjectType
  * bit set, every default applies) and a bit is cleared for each argument the
  * caller actually provided. One `Int` covers 32 parameters; past that the
  * compiler emits additional mask parameters, hence [maskCount].
+ *
+ * Bits are addressed by parameter index rather than by a cursor walked in step
+ * with the parameter list. The mask is filled in by the decoder, which visits
+ * parameters in whatever order the payload happens to list them — a cursor would
+ * have to be driven by that order and would silently shift every subsequent bit
+ * the moment the two walks diverged.
  */
 class Masker(
     count: Int,
@@ -47,46 +54,79 @@ class Masker(
     /** The mask value that results when every defaulted parameter was supplied. */
     private val maskAllSetValues = Array(maskCount) { -1 }
 
-    private var maskIndex = 0
-    private var maskNameIndex = 0
+    /** The mask holding parameter [index]'s bit. */
+    fun maskNameOf(index: Int): String = maskNames[index / 32]
 
-    /** Advances to the next parameter position, rolling over every 32 bits. */
-    fun advance() {
-        maskIndex++
-        if (maskIndex == 32) {
-            maskIndex = 0
-            maskNameIndex++
-        }
-    }
+    /** Parameter [index]'s bit within [maskNameOf]. */
+    fun bitOf(index: Int): Int = 1 shl (index % 32)
 
-    /** Declares the mask locals, all defaults applying. */
-    fun declare(code: CodeBlock.Builder) {
-        for (maskName in maskNames) {
-            code.addStatement("var %L = -1", maskName)
-        }
+    /**
+     * The masks as properties of the generated decoder, all defaults applying.
+     *
+     * Fields rather than locals of the wrapper: `deserialize` writes them and the
+     * wrapper reads them afterwards, and a captured local `var` would be boxed
+     * into an `IntRef` per call — one allocation per mask, on top of the decoder
+     * itself.
+     */
+    fun fields(): List<PropertySpec> = maskNames.map { maskName ->
+        PropertySpec.builder(maskName, INT)
+            .addAnnotation(JvmFieldClass)
+            .mutable(true)
+            .initializer("-1")
+            .build()
     }
 
     /**
-     * Emits the statement clearing the current parameter's bit, and records the
-     * same clearing in [maskAllSetValues] so [allArgumentsSupplied] stays in
-     * sync with the code being generated.
+     * Emits the statement clearing parameter [index]'s bit, and records the same
+     * clearing in [maskAllSetValues] so [allArgumentsSupplied] stays in sync with
+     * the code being generated.
+     *
+     * Called for mandatory parameters too, not just defaulted ones. Their bits
+     * are what [requiredBits] then tests for a payload that omitted them, and
+     * clearing them cannot disturb the call: the compiler only emits a
+     * substitution branch for parameters that actually have a default, so the
+     * synthetic method never reads the others' bits.
      */
-    fun clearCurrentBit(code: CodeBlock.Builder) {
-        val inverted = (1 shl maskIndex).inv()
-        maskAllSetValues[maskNameIndex] = maskAllSetValues[maskNameIndex] and inverted
-        code.addComment("\$mask = \$mask and (1 shl %L).inv()", maskIndex)
+    fun clearBit(code: CodeBlock.Builder, index: Int) {
+        val maskIndex = index / 32
+        val inverted = bitOf(index).inv()
+        maskAllSetValues[maskIndex] = maskAllSetValues[maskIndex] and inverted
+        code.addComment("\$mask = \$mask and (1 shl %L).inv()", index % 32)
         code.addStatement(
             "%1L = %1L and 0x%2L.toInt()",
-            maskNames[maskNameIndex],
+            maskNames[maskIndex],
             Integer.toHexString(inverted),
         )
     }
 
-    /** The condition that holds when no default needs to be substituted. */
-    fun allArgumentsSupplied(): CodeBlock = maskNames.withIndex().map { (index, maskName) ->
-        CodeBlock.of("$maskName·== 0x${Integer.toHexString(maskAllSetValues[index])}.toInt()")
-    }.joinToCode("·&& ")
+    /**
+     * The bits of [indices], one entry per mask that holds at least one of them.
+     *
+     * Grouped rather than returned per index so a check over many parameters
+     * collapses to one `and` per mask instead of one per parameter.
+     */
+    fun requiredBits(indices: List<Int>): List<Pair<String, Int>> {
+        val bits = IntArray(maskCount)
+        for (index in indices) {
+            bits[index / 32] = bits[index / 32] or bitOf(index)
+        }
+        return maskNames.withIndex()
+            .filter { (index, _) -> bits[index] != 0 }
+            .map { (index, maskName) -> maskName to bits[index] }
+    }
 
-    /** The mask locals, in order, as arguments to the synthetic method. */
-    fun asArguments(): CodeBlock = maskNames.map { CodeBlock.of("%L", it) }.joinToCode(", ")
+    /**
+     * The condition that holds when no default needs to be substituted.
+     *
+     * [prefix] qualifies the mask names — the masks live on the decoder object,
+     * so the wrapper reads them through it while `deserialize` writes them bare.
+     */
+    fun allArgumentsSupplied(prefix: String = ""): CodeBlock =
+        maskNames.withIndex().map { (index, maskName) ->
+            CodeBlock.of("$prefix$maskName·== 0x${Integer.toHexString(maskAllSetValues[index])}.toInt()")
+        }.joinToCode("·&& ")
+
+    /** The masks, in order, as arguments to the synthetic method. See [allArgumentsSupplied] for [prefix]. */
+    fun asArguments(prefix: String = ""): CodeBlock =
+        maskNames.map { CodeBlock.of("%L%L", prefix, it) }.joinToCode(", ")
 }
