@@ -20,128 +20,33 @@ export type Unlisten = () => void
 
 // ---- types --------------------------------------------------------------------
 
-/** `revxrsal.kitsune.ButtonClicked` */
-export interface ButtonClicked {
-  x: number
-  y: number
+/** `revxrsal.kitsune.SomeEvent` */
+export interface SomeEvent {
+  id: number
+  name?: string
 }
 
 // ---- functions ----------------------------------------------------------------
 
-/** `revxrsal.kitsune.add` */
-export interface Args_add {
-  a: number
-  b: number
-}
-
-/** `revxrsal.kitsune.add` */
-export function add(args: Args_add): Promise<number> {
-  return Bridge.call(0, args)
-}
-
-/** `revxrsal.kitsune.fetch` */
-export interface Args_fetch {
-  url: string
-}
-
-/** `revxrsal.kitsune.fetch` */
-export function fetch(args: Args_fetch): Promise<string> {
-  return Bridge.call(1, args)
-}
-
-/** `revxrsal.kitsune.Greeter.greet` */
-export interface Args_greet {
-  name?: string
-}
-
-/** `revxrsal.kitsune.Greeter.greet` */
-export function greet(args: Args_greet = {}): Promise<string> {
-  return Bridge.call(2, args)
-}
-
-/** `revxrsal.kitsune.label` */
-export interface Args_label {
-  text?: string | null
-}
-
-/** `revxrsal.kitsune.label` */
-export function label(args: Args_label = {}): Promise<string> {
-  return Bridge.call(3, args)
-}
-
-/** `revxrsal.kitsune.Store.load` */
-export interface Args_load {
-  key?: string
-  limit?: number
-}
-
-/** `revxrsal.kitsune.Store.load` */
-export function load(args: Args_load = {}): Promise<string> {
-  return Bridge.call(4, args)
-}
-
-/** `revxrsal.kitsune.log` */
-export interface Args_log {
-  message?: string
-  level?: number
-}
-
-/** `revxrsal.kitsune.log` */
-export function log(args: Args_log = {}): Promise<void> {
-  return Bridge.call(5, args)
-}
-
-/** `revxrsal.kitsune.poll` */
-export interface Args_poll {
-  source?: string
-  attempts?: number
-}
-
-/** `revxrsal.kitsune.poll` */
-export function poll(args: Args_poll = {}): Promise<string> {
-  return Bridge.call(6, args)
-}
-
-/** `revxrsal.kitsune.reverse` */
-export interface Args_reverse {
-  input?: string
-  times?: number
-}
-
-/** `revxrsal.kitsune.reverse` */
-export function reverse(args: Args_reverse = {}): Promise<string> {
-  return Bridge.call(7, args)
-}
-
-/** `revxrsal.kitsune.version` */
-export function version(): Promise<string> {
-  return Bridge.call(8, {})
-}
-
-/** `revxrsal.kitsune.warm` */
-export interface Args_warm {
-  target?: string
-}
-
-/** `revxrsal.kitsune.warm` */
-export function warm(args: Args_warm = {}): Promise<void> {
-  return Bridge.call(9, args)
+/** `revxrsal.kitsune.emitEvent` */
+export function emitEvent(): Promise<void> {
+  return Bridge.call(0, {})
 }
 
 // ---- events -------------------------------------------------------------------
 
-/** `revxrsal.kitsune.ButtonClicked` */
-export const ButtonClicked = {
+/** `revxrsal.kitsune.SomeEvent` */
+export const SomeEvent = {
   /** The ordinal this event travels under, on both sides of the bridge. */
   ordinal: 0,
 
   /** The id it was declared with. Diagnostics only — the wire carries the ordinal. */
-  id: 'clicked',
+  id: 'SomeEvent',
 
   /** Sends the event to Kotlin, where every `@Listener` for it runs. */
-  emit: (event: ButtonClicked): Promise<void> => Bridge.emit(0, event),
+  emit: (event: SomeEvent): Promise<void> => Bridge.emit(0, event),
 
   /** Subscribes to the event; call the result to stop. */
-  listen: (handler: (event: ButtonClicked) => void): Unlisten =>
+  listen: (handler: (event: SomeEvent) => void): Unlisten =>
     Bridge.listen(0, handler as (event: unknown) => void),
 }

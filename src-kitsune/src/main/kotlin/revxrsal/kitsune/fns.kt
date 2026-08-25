@@ -1,95 +1,24 @@
 package revxrsal.kitsune
 
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
+import revxrsal.kitsune.app.application
 import revxrsal.kitsune.event.ExportEvent
-import revxrsal.kitsune.functions.ExportFunction
 import revxrsal.kitsune.event.Listener
-import kotlin.time.Duration.Companion.milliseconds
+import revxrsal.kitsune.functions.ExportFunction
 
-/** No arguments: the generated wrapper decodes nothing. */
-@ExportFunction
-fun version(): String {
-    return "1.0"
-}
-
-/** All arguments mandatory: decoded and called directly. */
-@ExportFunction(name = "add")
-fun add(a: Int, b: Int): Int {
-    return a + b
-}
-
-/** Defaulted arguments: the generated wrapper masks and may go through `reverse$default`. */
-@ExportFunction
-fun reverse(input: String = "", times: Int = 1): String {
-    return input.reversed().repeat(times)
-}
-
-/**
- * Nullable *and* defaulted, the shape that needs the decoder's mask.
- *
- * `{}` and `{"text": null}` are different calls — the first takes the default,
- * the second really means null — and nothing in the decoded value distinguishes
- * them. Only the mask does, because it records which keys the payload carried.
- */
-@ExportFunction
-fun label(text: String? = "untitled"): String = text ?: "<null>"
-
-/** A member of an object, to cover the non-top-level call site. */
-object Greeter {
-
-    @ExportFunction(name = "greet")
-    fun greet(name: String = "world"): String = "hello, $name"
-}
-
-@ExportFunction
-fun log(message: String = "ping", level: Int = 1) {
-    println("[$level] $message")
-}
-
-@ExportFunction
-suspend fun fetch(url: String): String {
-    delay(10.milliseconds)
-    return "fetched $url"
-}
-
-/** Suspending with defaults: goes through `poll$default` with a continuation. */
-@ExportFunction
-suspend fun poll(source: String = "default", attempts: Int = 3): String {
-    delay(10.milliseconds)
-    return "polled $source x$attempts"
-}
-
-/** Suspending and Unit-returning: still returns `Object` at the JVM level. */
-@ExportFunction
-suspend fun warm(target: String = "cache") {
-    delay(10.milliseconds)
-    println("warmed $target")
-}
-
-/** Suspending member of an object. */
-object Store {
-
-    @ExportFunction(name = "load")
-    suspend fun load(key: String = "k", limit: Int = 10): String {
-        delay(10.milliseconds)
-        return "loaded $key/$limit"
-    }
-}
-
-// --- events ----------------------------------------------------------------
-
-@ExportEvent(id = "clicked")
+@ExportEvent
 @Serializable
-class ButtonClicked(val x: Int, val y: Int)
+data class SomeEvent(val id: Int, val name: String = "hi")
 
-@Listener
-fun onButtonClicked(event: ButtonClicked) {
-    println("clicked at ${event.x}, ${event.y}")
+@ExportFunction
+fun emitEvent() {
+    application.eventsHandler.dispatch(
+        event = SomeEvent(1),
+        serializer = SomeEvent.serializer(),
+    )
 }
 
 @Listener
-suspend fun onButtonClickedAsync(event: ButtonClicked) {
-    delay(10.milliseconds)
-    println("async click handled at ${event.x}, ${event.y}")
+fun onSomeEvent(event: SomeEvent) {
+    println("Received $event")
 }

@@ -98,10 +98,21 @@ fun writeEventsFile(
         PropertySpec.builder("ids", ARRAY.parameterizedBy(STRING))
             .addKdoc(
                 "The event id at each ordinal. Sorted, because that is how the ordinals\n" +
-                    "were handed out — so an id maps back through `binarySearch`.\n"
+                        "were handed out — so an id maps back through `binarySearch`.\n"
             )
             .addAnnotation(JvmFieldClass)
             .initializer(table(events) { CodeBlock.of("%S", it.id) })
+            .build()
+    )
+
+    generated.addProperty(
+        PropertySpec.builder("idsByClassName", ARRAY.parameterizedBy(STRING))
+            .addKdoc(
+                "The event id at each ordinal. Sorted, because that is how the ordinals\n" +
+                        "were handed out — so an id maps back through `binarySearch`.\n"
+            )
+            .addAnnotation(JvmFieldClass)
+            .initializer(table(events) { CodeBlock.of("%S", it.qualifiedName) })
             .build()
     )
 
@@ -132,7 +143,7 @@ fun writeEventsFile(
             .returns(Runtime.EventHandler)
             .addCode(
                 CodeBlock.of(
-                    "return %T(ids, deserializers, listeners, suspendingListeners)\n",
+                    "return %T(ids, idsByClassName, deserializers, listeners, suspendingListeners)\n",
                     Runtime.EventHandler,
                 )
             )

@@ -4,6 +4,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationStrategy
+import kotlinx.serialization.serializer
 import revxrsal.kitsune.ipc.KitsuneCbor
 import revxrsal.kitsune.coroutines.KitsuneScope
 
@@ -23,6 +26,7 @@ import revxrsal.kitsune.coroutines.KitsuneScope
  */
 class EventHandler(
     private val ids: Array<String>,
+    val idsByClassName: Array<String>,
     private val deserializers: Array<DeserializationStrategy<*>>,
     private val listeners: Array<Array<(Any) -> Unit>>,
     private val suspendingListeners: Array<Array<suspend (Any) -> Unit>>,
@@ -32,17 +36,17 @@ class EventHandler(
     init {
         require(
             ids.size == deserializers.size &&
-                ids.size == listeners.size &&
-                ids.size == suspendingListeners.size
+                    ids.size == listeners.size &&
+                    ids.size == suspendingListeners.size
         ) {
             "Event tables disagree on how many events there are: ${ids.size} ids, " +
-                "${deserializers.size} deserializers, ${listeners.size} listener rows, " +
-                "${suspendingListeners.size} suspending listener rows"
+                    "${deserializers.size} deserializers, ${listeners.size} listener rows, " +
+                    "${suspendingListeners.size} suspending listener rows"
         }
     }
 
     /** Every registered event id, in ordinal order. */
-    val events: List<String> get() = ids.asList()
+    internal val events: List<String> get() = ids.asList()
 
     /**
      * The ordinal [id] travels under, or `-1`.
@@ -51,7 +55,17 @@ class EventHandler(
      * them is how the ordinals were handed out in the first place. For a table
      * this size the search beats hashing, and it costs no extra structure at all.
      */
-    fun ordinalOf(id: String): Int = ids.binarySearch(id).let { if (it < 0) -1 else it }
+    internal fun ordinalOf(id: String): Int = ids.binarySearch(id).let { if (it < 0) -1 else it }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    inline fun <reified T> dispatch(
+        event: T,
+        serializer: SerializationStrategy<T> = serializer<T>(),
+    ) {
+        val ordinal = idsByClassName.binarySearch(T::class.java.name).let { if (it < 0) -1 else it }
+        val payload = KitsuneCbor.encodeToByteArray(serializer, event)
+        dispatch(ordinal, payload, EventSource.KOTLIN)
+    }
 
     /**
      * Decodes [payload] as the event registered at [ordinal], runs every plain

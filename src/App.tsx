@@ -1,17 +1,16 @@
 import {useState} from "react";
 import reactLogo from "./assets/react.svg";
 import "./App.css";
-import {reverse} from "./bindings.ts";
+import {emitEvent, SomeEvent} from "./bindings.ts";
 
 function App() {
   const [name, setName] = useState("");
   const [button, setButton] = useState("Greet")
 
   async function greet() {
-    const result = await reverse({
-      input: name,
-    })
-    setButton(result)
+    await emitEvent()
+    await SomeEvent.emit({id: 20})
+    SomeEvent.listen(v => console.log(v));
   }
 
   return (
