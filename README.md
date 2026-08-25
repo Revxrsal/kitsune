@@ -81,27 +81,23 @@ object TestApplication : KitsuneApplication() {
 Build, and `src/bindings.ts` appears next to your frontend code:
 
 ```ts
-/** `revxrsal.kitsune.test.add` */
-export interface Args_add {
-  a: number
-  b: number
-}
+/** `revxrsal.kitsune.test.version` */
+export function version(): Promise<string> { ... }
 
 /** `revxrsal.kitsune.test.add` */
-export function add(args: Args_add): Promise<number> {
-  return Bridge.call(0, args)
-}
+export function add(args: { a: number; b: number }): Promise<number> { ... }
+
+/** `revxrsal.kitsune.test.reverse` */
+export function reverse(args: { input?: string; times?: number } = {}): Promise<string> { ... }
+
+/** `revxrsal.kitsune.test.label` */
+export function label(args: { text?: string | null } = {}): Promise<string> { ... }
+
+/** `revxrsal.kitsune.test.fetch` */
+export function fetch(args: { url: string }): Promise<string> { ... }
 
 /** `revxrsal.kitsune.test.Store.load` */
-export interface Args_load {
-  key?: string
-  limit?: number
-}
-
-/** `revxrsal.kitsune.test.Store.load` */
-export function load(args: Args_load = {}): Promise<string> {
-  return Bridge.call(4, args)
-}
+export function load(args: { key?: string; limit?: number } = {}): Promise<string> { ... }
 ```
 
 Which you call like any other function:
@@ -111,7 +107,7 @@ import { add, load, reverse } from './bindings'
 
 const sum = await add({ a: 1, b: 2 })         // 3
 const rev = await reverse({ input: 'abc' })   // "cba", `times` defaulted to 1
-const row = await load({})                    // both defaults apply
+const row = await load()                      // both defaults apply
 ```
 
 Notice what the types encode. `a` and `b` are required because Kotlin declares
