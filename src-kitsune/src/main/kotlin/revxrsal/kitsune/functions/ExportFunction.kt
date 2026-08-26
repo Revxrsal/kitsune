@@ -3,9 +3,11 @@ package revxrsal.kitsune.functions
 /**
  * Exposes a function to the Rust host.
  *
- * The function must be top-level or a member of an `object`, public, and not
- * `suspend` — the generated wrapper calls it from a static context with no
- * coroutine scope to call it in.
+ * The function must be top-level or a member of an `object`, and public. It may
+ * be `suspend`: the generated wrapper launches it into a coroutine scope and
+ * delivers the result back to the host when it completes, so suspending exports
+ * never block the host thread. Plain functions run straight through with no
+ * coroutine machinery at all.
  *
  * [name] must be unique across the module. Left blank, it is the function's own
  * name.

@@ -57,6 +57,7 @@ fun renderBindings(
     // a side effect, and the declarations they reached have to be known before
     // the file can be laid out.
     val renderedFunctions = functions.mapNotNull { renderFunction(it, types, logger) }
+    val functionSections = assembleFunctions(renderedFunctions)
     val renderedEvents = events.mapNotNull { renderEvent(it, types, logger) }
 
     val sections = mutableListOf(HEADER)
@@ -76,9 +77,9 @@ fun renderBindings(
         sections += banner("types")
         sections += declarations
     }
-    if (renderedFunctions.isNotEmpty()) {
+    if (functionSections.isNotEmpty()) {
         sections += banner("functions")
-        sections += renderedFunctions
+        sections += functionSections
     }
     if (renderedEvents.isNotEmpty()) {
         sections += banner("events")
@@ -109,57 +110,107 @@ private fun banner(title: String): String =
     "// ---- $title " + "-".repeat(72 - title.length) + "-"
 
 /**
+ * One rendered export, split into the pieces the file assembler places
+ * independently.
+ *
+ * [owner] is the simple name of the enclosing `object`, or null for a top-level
+ * function. It is what decides whether the [binding] is emitted at file scope or
+ * nested inside an `export const <owner> = { ... }`. [argsInterface] — the
+ * argument object's `export interface` — is always emitted at file scope, since
+ * an interface cannot live inside an object literal.
+ */
+private class RenderedFunction(
+    val owner: String?,
+    val argsInterface: String?,
+    val binding: String,
+)
+
+/**
  * One exported function: its argument object, and the call that forwards to it.
  *
  * The wrapper is a plain forward to [Bridge.call] with the ordinal baked in —
  * the encoding, the transport and the reply all belong to the bridge, and
  * duplicating any of it per function would be one more place for the two sides
  * to drift.
+ *
+ * A member of an `object` is rendered as a method-shorthand entry with no
+ * `export` of its own; the assembler collects it into the object literal that
+ * mirrors the Kotlin object. A top-level function is a plain `export function`.
  */
-private fun renderFunction(bound: BoundFunction, types: TsTypes, logger: KSPLogger): String? {
+private fun renderFunction(bound: BoundFunction, types: TsTypes, logger: KSPLogger): RenderedFunction? {
     val name = bound.exportedName
     if (!name.isBindable(logger, "function", bound.function.function)) return null
 
     val function = bound.function
+    val owner = function.owner?.simpleName?.asString()
     val returns = function.function.returnType?.resolve()
         ?.let { types.typeOf(it, function.function) }
         ?: "void"
 
     val documentation = "/** `${function.qualifiedName}` */"
     val ordinal = bound.ordinal
+
+    // The signature and forwarding body, shared between the top-level and the
+    // object-member forms — only the `export function` vs. method-shorthand
+    // preamble differs.
+    val signature: String
+    val call: String
+    var argsInterface: String? = null
+
     if (function.parameters.isEmpty()) {
-        return """
-            |$documentation
-            |export function $name(): Promise<$returns> {
-            |  return Bridge.call($ordinal, {})
-            |}
-        """.trimMargin()
+        signature = "$name(): Promise<$returns>"
+        call = "Bridge.call($ordinal, {})"
+    } else {
+        // Named after the descriptor's serial name rather than after the function,
+        // so a payload rejected by the Kotlin decoder names the same thing the
+        // caller was looking at when they built it.
+        val argumentsType = function.argumentsSerialName
+        val fields = function.parameters.joinToString("\n") { parameter ->
+            val optional = if (parameter.hasDefault) "?" else ""
+            "  ${quote(parameter.name)}$optional: ${types.typeOf(parameter.type, parameter.declaration)}"
+        }
+
+        // Every parameter defaulted means the whole object may be left out, which
+        // is the difference between `version()` and `reverse()` reading naturally.
+        val default = if (function.parameters.all { it.hasDefault }) " = {}" else ""
+
+        argsInterface = "$documentation\nexport interface $argumentsType {\n$fields\n}"
+        signature = "$name(args: $argumentsType$default): Promise<$returns>"
+        call = "Bridge.call($ordinal, args)"
     }
 
-    // Named after the descriptor's serial name rather than after the function,
-    // so a payload rejected by the Kotlin decoder names the same thing the
-    // caller was looking at when they built it.
-    val argumentsType = function.argumentsSerialName
-    val fields = function.parameters.joinToString("\n") { parameter ->
-        val optional = if (parameter.hasDefault) "?" else ""
-        "  ${quote(parameter.name)}$optional: ${types.typeOf(parameter.type, parameter.declaration)}"
+    val preamble = if (owner == null) "export function " else ""
+    val binding = "$documentation\n$preamble$signature {\n  return $call\n}"
+    return RenderedFunction(owner, argsInterface, binding)
+}
+
+/**
+ * Lays the rendered functions out for the `functions` section.
+ *
+ * Top-level functions keep their argument interface adjacent, exactly as before.
+ * Object members are grouped by their enclosing object, their interfaces hoisted
+ * to file scope ahead of the object, and their bindings collected into a single
+ * `export const <object> = { ... }` — so `Store.load` in Kotlin is called as
+ * `Store.load` in TypeScript, and the object namespace survives the bridge.
+ *
+ * Grouping preserves ordinal order: `groupBy` keeps first-encounter order for the
+ * objects and declaration order within each, and the functions arrive here sorted
+ * by ordinal.
+ */
+private fun assembleFunctions(rendered: List<RenderedFunction>): List<String> {
+    val sections = mutableListOf<String>()
+
+    for (function in rendered.filter { it.owner == null }) {
+        sections += listOfNotNull(function.argsInterface, function.binding).joinToString("\n\n")
     }
 
-    // Every parameter defaulted means the whole object may be left out, which is
-    // the difference between `version()` and `reverse()` reading naturally.
-    val default = if (function.parameters.all { it.hasDefault }) " = {}" else ""
+    for ((owner, members) in rendered.filter { it.owner != null }.groupBy { it.owner }) {
+        members.mapNotNull { it.argsInterface }.forEach { sections += it }
+        val body = members.joinToString(",\n\n") { it.binding.prependIndent("  ") }
+        sections += "/** Members of the `$owner` object. */\nexport const $owner = {\n$body,\n}"
+    }
 
-    return """
-        |$documentation
-        |export interface $argumentsType {
-        |$fields
-        |}
-        |
-        |$documentation
-        |export function $name(args: $argumentsType$default): Promise<$returns> {
-        |  return Bridge.call($ordinal, args)
-        |}
-    """.trimMargin()
+    return sections
 }
 
 /**

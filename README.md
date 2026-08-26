@@ -1,57 +1,98 @@
 <div align="center">
 
-# Kitsune
+# 🦊 Kitsune
 
 **Write your Tauri backend in Kotlin.**
 
-Annotate a function, and it shows up in your frontend as a typed
-`Promise`-returning binding. No IPC boilerplate, no hand-written command names,
-no JSON schemas to keep in sync.
+A highly optimized Kotlin runtime bolted onto Tauri, with all the glue you need
+to write your entire backend in Kotlin — invokable directly from your frontend,
+fully typed, with zero IPC boilerplate.
 
 </div>
 
 ---
 
-## The pitch
+Annotate a Kotlin function:
+
+```kotlin
+@ExportFunction
+fun log(message: String = "ping", level: Int = 1) {
+    println("[$level] $message")
+}
+
+@ExportFunction
+suspend fun fetchFromUrl(url: String): String {
+    delay(10.milliseconds)   // real suspend work, on a coroutine
+    return "fetched $url"
+}
+```
+
+Call it from TypeScript as if it were local:
+
+```ts
+import { log, fetchFromUrl } from './bindings'
+
+await log({ message: 'hello' })                    // level defaults to 1
+const page = await fetchFromUrl({ url: 'https://github.com' })
+```
+
+No command names to register, no JSON schemas to keep in sync, no hand-written
+IPC. A KSP processor reads your Kotlin at compile time and writes all three
+halves of the bridge — the Kotlin dispatch registry, the TypeScript bindings,
+and the Rust JNI handover. None of them is written by hand, so none of them can
+drift.
+
+## Why Kitsune
 
 Tauri gives you a tiny, fast shell and a real webview. Rust gives you a fast
 host. What neither gives you is the language most application logic is
-comfortable in: something with coroutines, null safety, data classes, default
-arguments and a huge library ecosystem.
+comfortable in — one with coroutines, null safety, data classes, default
+arguments and a huge library ecosystem. Kitsune bolts a Kotlin runtime onto a
+Tauri app and makes it feel native to both sides.
 
-Kitsune bolts a Kotlin runtime onto a Tauri app and makes it feel native to
-both sides. You write ordinary Kotlin. A KSP processor reads it at compile time
-and writes three things: the dispatch registry on the Kotlin side, the
-TypeScript bindings on the frontend side, and the JNI handover on the Rust side.
-The three halves cannot drift, because none of them is written by hand.
+**First-class Kotlin, not a lowest-common-denominator FFI.** Default arguments,
+`suspend` functions, coroutines, nullable types, `object` members — all of them
+cross the wire and behave exactly as you'd expect. Exports are driven entirely
+by annotations.
 
-The JVM it ships is not the one on your machine. It is a `jlink` image trimmed
-to the modules your code actually uses, carrying an AOT cache recorded at build
-time, embedded straight into the Tauri binary.
+**Fast by construction.** Every layer of the bridge was benchmarked and then
+rewritten around what the numbers said:
+
+1. **CBOR, not JSON** for JS ⟷ Rust ⟷ Kotlin — the payload crosses as bytes either way, so there's no reason to make a human-readable format nobody reads.
+2. **No intermediary representation.** Arguments are encoded once in the frontend and decoded once in Kotlin — no serde value, no JSON string, no map in between.
+3. **Zero extra allocations on the call path.** Nothing is copied, stringified or boxed just to move a call across and its result back.
+4. **Integer ordinals, not strings.** Function and event calls are addressed by ordinal, so dispatch allocates nothing.
+5. **No reflection.** Every serializer, decoder and dispatch table is generated at compile time (like serde), never discovered at runtime.
+6. **A trimmed, pre-warmed JVM.** The runtime that ships is a `jlink` image containing only the modules your code uses, carrying an AOT cache recorded at build time and compressed with `zstd` — embedded straight into the Tauri binary.
 
 ## What it looks like
 
 Here is the entire backend of a small app:
 
 ```kotlin
-package revxrsal.kitsune.aot
+@ExportFunction
+fun version(): String {
+    return "1.0"
+}
 
 @ExportFunction
-fun version(): String = "1.0"
-
-@ExportFunction
-fun add(a: Int, b: Int): Int = a + b
+fun add(a: Int, b: Int): Int {
+    return a + b
+}
 
 // Default arguments survive the wire. Omitting `times` in TypeScript
 // is what makes the Kotlin default apply.
 @ExportFunction
-fun reverse(input: String = "", times: Int = 1): String =
-    input.reversed().repeat(times)
+fun reverse(input: String = "", times: Int = 1): String {
+    return input.reversed().repeat(times)
+}
 
 // Nullable *and* defaulted. `{}` and `{ text: null }` are different
 // calls, and the generated decoder can tell them apart.
 @ExportFunction
-fun label(text: String? = "untitled"): String = text ?: "<null>"
+fun label(text: String? = "untitled"): String {
+    return text ?: "<null>"
+}
 
 // `suspend` is a first-class export, not something you wrap by hand.
 @ExportFunction
@@ -63,7 +104,9 @@ suspend fun fetch(url: String): String {
 // Members of an `object` work too.
 object Store {
     @ExportFunction(name = "load")
-    suspend fun load(key: String = "k", limit: Int = 10): String = "loaded $key/$limit"
+    suspend fun load(key: String = "k", limit: Int = 10): String {
+        return "loaded $key/$limit"
+    }
 }
 ```
 
@@ -73,7 +116,7 @@ And an entrypoint, which is the only wiring you write:
 @KitsuneEntrypoint
 object TestApplication : KitsuneApplication() {
     init {
-        println("Application initialized from an object!")
+        println("Application initialized!")
     }
 }
 ```
@@ -96,26 +139,33 @@ export function label(args: { text?: string | null } = {}): Promise<string> { ..
 /** `revxrsal.kitsune.aot.fetch` */
 export function fetch(args: { url: string }): Promise<string> { ... }
 
-/** `revxrsal.kitsune.aot.Store.load` */
-export function load(args: { key?: string; limit?: number } = {}): Promise<string> { ... }
+// Members of an `object` are nested under a matching const, so the call site
+// mirrors the Kotlin: `Store.load` there, `Store.load` here.
+/** Members of the `Store` object. */
+export const Store = {
+  /** `revxrsal.kitsune.aot.Store.load` */
+  load(args: { key?: string; limit?: number } = {}): Promise<string> { ... },
+}
 ```
 
 Which you call like any other function:
 
 ```tsx
-import { add, load, reverse } from './bindings'
+import { add, reverse, Store } from './bindings'
 
 const sum = await add({ a: 1, b: 2 })         // 3
 const rev = await reverse({ input: 'abc' })   // "cba", `times` defaulted to 1
-const row = await load()                      // both defaults apply
+const row = await Store.load()                // both defaults apply
 ```
 
 Notice what the types encode. `a` and `b` are required because Kotlin declares
 them without defaults. `key` and `limit` are optional because Kotlin gives them
 defaults, and the whole argument object defaults to `{}` because every parameter
-is optional. A `suspend fun` is indistinguishable from a plain one at the call
-site: both are a `Promise`. That mapping is derived from the Kotlin
-declaration, so it stays true by construction.
+is optional. A member of an `object` lands under a const of the same name, so
+`Store.load` in Kotlin is `Store.load` in TypeScript. A `suspend fun` is
+indistinguishable from a plain one at the call site: both are a `Promise`. That
+mapping is derived from the Kotlin declaration, so it stays true by
+construction.
 
 ## Events, in both directions
 
@@ -153,10 +203,7 @@ Suspending listeners each get their own coroutine under a supervisor job, so one
 failing or hanging listener cannot take the others down with it. An event nobody
 listens for is dropped without being decoded at all.
 
-## Why it is fast
-
-Every layer of the bridge has been benchmarked and then rewritten around what
-the numbers said. The short version:
+## How the speed actually works
 
 **CBOR, not JSON.** The payload crosses into the JVM as raw bytes either way. A
 text format would mean an encode on one side and a parse on the other, for
@@ -167,7 +214,9 @@ frontend and decoded once in Kotlin. There is no serde value, no JSON string and
 no map in between, in either direction.
 
 **Zero extra allocations on the call path.** Nothing is copied, stringified or
-boxed just to get a call from the webview to Kotlin and its result back.
+boxed just to get a call from the webview to Kotlin and its result back. Calls
+are addressed by integer ordinal rather than by name, so even dispatch allocates
+nothing.
 
 **No reflection.** Every decoder, every dispatch table and every call site is
 generated ahead of time at compile time, so nothing has to be discovered at
@@ -183,7 +232,7 @@ contains only the pieces your code actually uses, and it comes with an AOT cache
 recorded at build time. Class loading and linking, normally the bulk of what a
 JVM does before your first line runs, has already happened by the time the app
 launches. For the sample app that is about 42 MB of runtime, a 3.9 MB jar and an
-11 MB cache, all embedded in the binary.
+11 MB cache, all embedded in the binary and compressed with `zstd`.
 
 Getting that right takes care, so the build does it for you. The cache is
 re-recorded whenever the code it was trained on changes, and every build checks
@@ -315,3 +364,5 @@ suite they are, and delete them when you start your own app.
 
 Linux is what it has been developed against. The runtime path logic covers
 macOS and Windows, but neither has been exercised.
+</parameter>
+</invoke>
