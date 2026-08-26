@@ -7,8 +7,12 @@
 //!
 //! Anywhere, as it turns out. The cache is recorded against the absolute
 //! classpath in `src-kitsune/dist` (see AotCacheTask), but the JVM validates
-//! classpath entry [0] — the modules image — and lets the app jar at entry [1]
-//! through on name alone. An image unpacked under `~/.cache` still reports
+//! classpath entry [0] — the modules image — by name only, so an image unpacked
+//! under `~/.cache` still passes. The app jar at entry [1] is checked by name
+//! *and* mtime, so AotCacheTask records it against a zeroed mtime and [`unpack`]
+//! pins the extracted jar back to the exact epoch; otherwise the cache is
+//! rejected at load time with "timestamp has changed". An image
+//! unpacked under `~/.cache` still reports
 //! `full module graph: enabled`, which is what makes this approach viable at
 //! all: under `-XX:AOTMode=on` a rejected cache is a failed launch, not a slow
 //! one.
@@ -83,11 +87,25 @@ fn unpack(staging: &Path) -> Result<()> {
     // The executable bit on `runtime/lib/jspawnhelper` lives in the tar header
     // and nowhere else; without it the JVM cannot spawn processes.
     archive.set_preserve_permissions(true);
-    archive.set_preserve_mtime(false);
+    archive.set_preserve_mtime(true);
     archive.set_overwrite(true);
     archive
         .unpack(staging)
-        .with_context(|| format!("cannot unpack bundled runtime into {}", staging.display()))
+        .with_context(|| format!("cannot unpack bundled runtime into {}", staging.display()))?;
+
+    // The AOT cache is recorded against app.jar's mtime, which AotCacheTask
+    // zeroes so it can be reproduced here. tar's mtime round trip is not exact,
+    // though — a zeroed entry comes back out one second past the epoch — and
+    // under -XX:AOTMode=on even that one-second drift is a fatal "shared class
+    // paths mismatch", not a soft downgrade. Pin the jar to the exact epoch the
+    // cache expects rather than trusting the archive to carry it through.
+    let jar = staging.join("lib/app.jar");
+    File::options()
+        .write(true)
+        .open(&jar)
+        .and_then(|f| f.set_modified(std::time::SystemTime::UNIX_EPOCH))
+        .with_context(|| format!("cannot normalize the mtime of {}", jar.display()))?;
+    Ok(())
 }
 
 /// Deletes every extracted image except this build's.

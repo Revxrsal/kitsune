@@ -1,7 +1,9 @@
 import {useState} from "react";
 import reactLogo from "./assets/react.svg";
 import "./App.css";
-import {emitEvent, SomeEvent} from "./bindings.ts";
+import {emitEvent, SomeEvent, warmUp} from "./bindings.ts";
+
+void warmUp()
 
 function App() {
   const [name, setName] = useState("");
@@ -11,6 +13,8 @@ function App() {
     await emitEvent()
     await SomeEvent.emit({id: 20})
     SomeEvent.listen(v => console.log(v));
+    setButton("Greet");
+    console.log(name)
   }
 
   return (

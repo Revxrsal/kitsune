@@ -22,3 +22,8 @@ fun emitEvent() {
 fun onSomeEvent(event: SomeEvent) {
     println("Received $event")
 }
+
+@ExportFunction
+fun warmUp() {
+    println("JNI warmed up")
+}

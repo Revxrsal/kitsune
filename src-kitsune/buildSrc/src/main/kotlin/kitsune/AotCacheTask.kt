@@ -77,6 +77,18 @@ abstract class AotCacheTask : DefaultTask() {
         val java = runtimeDir.get().asFile.resolve("bin/java").absolutePath
         // Absolute, so the recorded classpath matches what the host passes.
         val classpath = jar.get().asFile.absolutePath
+
+        // The AOT cache records each classpath jar's mtime and, under
+        // -XX:AOTMode=on, rejects the cache at load time if it no longer matches
+        // ("timestamp has changed" -> "shared class paths mismatch" -> fatal).
+        // The shipped jar does not keep this jar's mtime: build.rs tars dist/
+        // with a zeroed mtime for reproducibility and bundle.rs restores it, so
+        // the extracted jar is always epoch 0. Record the cache against that
+        // same value here, so build-time and the unpacked production image agree.
+        require(jar.get().asFile.setLastModified(0)) {
+            "cannot zero the mtime of ${jar.get().asFile}; the AOT cache would record a " +
+                "timestamp the shipped jar cannot reproduce and fail to load under -XX:AOTMode=on"
+        }
         val config = configurationFile.get().asFile.also { it.parentFile.mkdirs() }
         val cache = cacheFile.get().asFile.also { it.parentFile.mkdirs() }
         val shared = vmOptions.get()

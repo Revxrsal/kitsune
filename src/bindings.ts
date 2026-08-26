@@ -33,6 +33,11 @@ export function emitEvent(): Promise<void> {
   return Bridge.call(0, {})
 }
 
+/** `revxrsal.kitsune.warmUp` */
+export function warmUp(): Promise<void> {
+  return Bridge.call(1, {})
+}
+
 // ---- events -------------------------------------------------------------------
 
 /** `revxrsal.kitsune.SomeEvent` */
