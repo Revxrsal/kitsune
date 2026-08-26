@@ -6,7 +6,7 @@
       <excludeFolder url="file://$MODULE_DIR$/../../../src-kitsune/codegen/.gradle" />
       <excludeFolder url="file://$MODULE_DIR$/../../../src-kitsune/codegen/build" />
     </content>
-    <orderEntry type="jdk" jdkName="temurin-25" jdkType="JavaSDK" />
+    <orderEntry type="jdk" jdkName="25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

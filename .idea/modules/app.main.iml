@@ -2,7 +2,7 @@
 <module external.linked.project.id="app:main" external.linked.project.path="$MODULE_DIR$/../../src-kitsune" external.root.project.path="$MODULE_DIR$/../../src-kitsune" external.system.id="GRADLE" external.system.module.group="revxrsal" external.system.module.type="sourceSet" external.system.module.version="1.0" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet external-system-id="GRADLE" type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../src-kitsune/src/main/kotlin;/home/ali/Rust/kitsune/src-kitsune/src/test/kotlin;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/test/java;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/main/kotlin;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/main/java;/home/ali/Rust/kitsune/src-kitsune/build/generated/ksp/test/kotlin">
+      <configuration version="5" platform="JVM 25" allPlatforms="JVM [25]" useProjectSettings="false" pureKotlinSourceFolders="C:\Users\Ali\Rust\kitsune\src-kitsune\build\generated\ksp\main\kotlin;C:\Users\Ali\Rust\kitsune\src-kitsune\build\generated\ksp\test\java;C:\Users\Ali\Rust\kitsune\src-kitsune\build\generated\ksp\test\kotlin;C:\Users\Ali\Rust\kitsune\src-kitsune\build\generated\ksp\main\java;C:\Users\Ali\Rust\kitsune\src-kitsune\src\main\kotlin;C:\Users\Ali\Rust\kitsune\src-kitsune\src\test\kotlin">
         <compilerSettings />
         <compilerArguments>
           <flagArguments>
@@ -29,6 +29,7 @@
                 <arg>$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar</arg>
               </args>
             </arrayArg>
+            <arrayArg name="pluginOptions" />
           </arrayArguments>
         </compilerArguments>
       </configuration>
@@ -45,7 +46,7 @@
       <sourceFolder url="file://$MODULE_DIR$/../../src-kitsune/src/main/kotlin" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../src-kitsune/src/main/resources" type="java-resource" />
     </content>
-    <orderEntry type="jdk" jdkName="temurin-25" jdkType="JavaSDK" />
+    <orderEntry type="jdk" jdkName="25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Gradle: org.jetbrains.kotlin:kotlin-stdlib:2.4.10" level="project" />
     <orderEntry type="library" name="Gradle: org.jetbrains:annotations:23.0.0" level="project" />

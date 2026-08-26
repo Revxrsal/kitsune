@@ -2,7 +2,7 @@
 <module external.linked.project.id=":codegen:main" external.linked.project.path="$MODULE_DIR$/../../../src-kitsune/codegen" external.root.project.path="$MODULE_DIR$/../../../src-kitsune" external.system.id="GRADLE" external.system.module.group="app" external.system.module.type="sourceSet" external.system.module.version="unspecified" type="JAVA_MODULE" version="4">
   <component name="FacetManager">
     <facet external-system-id="GRADLE" type="kotlin-language" name="Kotlin">
-      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="$MODULE_DIR$/../../../src-kitsune/codegen/src/test/kotlin;/home/ali/Rust/kitsune/src-kitsune/codegen/src/main/kotlin">
+      <configuration version="5" platform="JVM 21" allPlatforms="JVM [21]" useProjectSettings="false" pureKotlinSourceFolders="C:\Users\Ali\Rust\kitsune\src-kitsune\codegen\src\test\kotlin;C:\Users\Ali\Rust\kitsune\src-kitsune\codegen\src\main\kotlin">
         <compilerSettings>
           <option name="additionalArguments" value="-Xjdk-release=21" />
         </compilerSettings>
@@ -29,6 +29,7 @@
                 <arg>$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.jetbrains/annotations/13.0/919f0dfe192fb4e063e7dacadee7f8bb9a2672a9/annotations-13.0.jar</arg>
               </args>
             </arrayArg>
+            <arrayArg name="pluginOptions" />
           </arrayArguments>
         </compilerArguments>
       </configuration>
@@ -41,7 +42,7 @@
       <sourceFolder url="file://$MODULE_DIR$/../../../src-kitsune/codegen/src/main/kotlin" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/../../../src-kitsune/codegen/src/main/resources" type="java-resource" />
     </content>
-    <orderEntry type="jdk" jdkName="temurin-25" jdkType="JavaSDK" />
+    <orderEntry type="jdk" jdkName="25" jdkType="JavaSDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Gradle: org.jetbrains.kotlin:kotlin-stdlib:2.4.10" level="project" />
     <orderEntry type="library" name="Gradle: com.google.devtools.ksp:symbol-processing-api:2.3.11" level="project" />
