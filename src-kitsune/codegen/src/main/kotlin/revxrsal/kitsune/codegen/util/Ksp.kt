@@ -17,21 +17,21 @@ fun KSDeclaration.isReservedPackageName() =
  *
  * `null` covers both "top-level" and "member of something that isn't an object",
  * which callers distinguish by checking [KSDeclaration.parentDeclaration]
- * separately — a member of a plain class needs an instance the generated code
- * has no way to obtain, and is rejected rather than emitted.
+ * separately, since a member of a plain class needs an instance the generated
+ * code has no way to obtain, and is rejected rather than emitted.
  */
 fun KSDeclaration.enclosingObject(): KSClassDeclaration? =
     (parentDeclaration as? KSClassDeclaration)?.takeIf { it.classKind == ClassKind.OBJECT }
 
 /**
- * This class's binary name in JNI internal form — `revxrsal/kitsune/App`, with
+ * This class's binary name in JNI internal form: `revxrsal/kitsune/App`, with
  * nested classes joined by `$`.
  *
  * `FindClass` takes this form and no other: the dotted name a Kotlin programmer
  * writes is not a thing the JVM's class loader accepts here, and a nested class
  * written with a dot separator fails to resolve rather than failing to compile.
  *
- * Returns `null` for a local class — one declared inside a function — which has
+ * Returns `null` for a local class, one declared inside a function, which has
  * a compiler-assigned binary name that no generated code should depend on.
  */
 fun KSClassDeclaration.jniBinaryName(): String? {
@@ -52,8 +52,9 @@ fun KSClassDeclaration.jniBinaryName(): String? {
  * Whether this class has [qualifiedName] somewhere in its supertype chain.
  *
  * Walks rather than asking for a resolved supertype set, because KSP does not
- * offer one, and keeps a visited set: an erroneous hierarchy — a cycle produced
- * by a half-typed edit in an IDE-triggered build — reaches here as a graph, not
+ * offer one, and keeps a visited set: an erroneous hierarchy, such as a cycle
+ * produced by a half-typed edit in an IDE-triggered build, reaches here as a
+ * graph, not
  * a tree, and would otherwise recurse until the stack runs out.
  */
 fun KSClassDeclaration.isSubclassOf(qualifiedName: String): Boolean =

@@ -11,7 +11,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
  * module can do `implementation(project(":app"))` and then write
  * `getSymbolsWithAnnotation<ExportFunction>()`, because there the annotations
  * live in a library module separate from the one being processed. Here `:app`
- * *is* the module being processed — it applies this processor — so a dependency
+ * *is* the module being processed (it applies this processor), so a dependency
  * back onto it would be a cycle. Referring to the annotations by name is what
  * breaks it.
  *
@@ -40,7 +40,7 @@ fun Resolver.symbolsAnnotatedWith(annotation: String): Sequence<KSAnnotated> =
  * Reads a `String` argument off an annotation.
  *
  * Returns `null` when the annotation is absent, when the argument is absent, or
- * when it was left at its default — KSP reports defaults as the declared default
+ * when it was left at its default. KSP reports defaults as the declared default
  * value, so a blank result and an omitted argument are indistinguishable, and
  * both mean "derive it from the declaration name".
  */

@@ -6,7 +6,7 @@ import com.squareup.kotlinpoet.NameAllocator
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.joinToCode
 
-/** `Int::class.javaPrimitiveType` — the type of each mask parameter. */
+/** `Int::class.javaPrimitiveType`, the type of each mask parameter. */
 val INT_TYPE_BLOCK: CodeBlock = CodeBlock.of("%T::class.javaPrimitiveType", INT)
 
 /**
@@ -37,7 +37,7 @@ val DefaultConstructorMarkerType: CodeBlock = JavaObjectType
  *
  * Bits are addressed by parameter index rather than by a cursor walked in step
  * with the parameter list. The mask is filled in by the decoder, which visits
- * parameters in whatever order the payload happens to list them — a cursor would
+ * parameters in whatever order the payload happens to list them; a cursor would
  * have to be driven by that order and would silently shift every subsequent bit
  * the moment the two walks diverged.
  */
@@ -65,7 +65,7 @@ class Masker(
      *
      * Fields rather than locals of the wrapper: `deserialize` writes them and the
      * wrapper reads them afterwards, and a captured local `var` would be boxed
-     * into an `IntRef` per call — one allocation per mask, on top of the decoder
+     * into an `IntRef` per call, one allocation per mask, on top of the decoder
      * itself.
      */
     fun fields(): List<PropertySpec> = maskNames.map { maskName ->
@@ -118,7 +118,7 @@ class Masker(
     /**
      * The condition that holds when no default needs to be substituted.
      *
-     * [prefix] qualifies the mask names — the masks live on the decoder object,
+     * [prefix] qualifies the mask names: the masks live on the decoder object,
      * so the wrapper reads them through it while `deserialize` writes them bare.
      */
     fun allArgumentsSupplied(prefix: String = ""): CodeBlock =

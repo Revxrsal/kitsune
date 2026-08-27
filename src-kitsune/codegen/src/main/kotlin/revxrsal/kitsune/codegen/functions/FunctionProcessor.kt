@@ -47,7 +47,7 @@ class FunctionProcessor(
         val exported = LinkedHashMap<String, ExportedFun>()
 
         for (symbol in resolver.symbolsAnnotatedWith(Annotations.EXPORT_FUNCTION)) {
-            // @ExportFunction is @Target(FUNCTION), so this is defensive — but a
+            // @ExportFunction is @Target(FUNCTION), so this is defensive, but a
             // malformed symbol arrives as a plain KSAnnotated, and a cast would
             // fail the build with a ClassCastException and no source location.
             if (symbol !is KSFunctionDeclaration) {
@@ -94,7 +94,7 @@ class FunctionProcessor(
 
         if (exported.isEmpty()) {
             // An app that exports nothing is legitimate, but this is also
-            // exactly what a moved annotation package looks like — see
+            // exactly what a moved annotation package looks like; see
             // Annotations, which matches on names the compiler never checks.
             logger.warn(
                 "Kitsune codegen found no @ExportFunction declarations. If that is unexpected, " +
@@ -117,7 +117,7 @@ class FunctionProcessor(
 }
 
 /**
- * Orders the exports by ordinal — index in the returned list *is* the ordinal.
+ * Orders the exports by ordinal: index in the returned list *is* the ordinal.
  *
  * [assignOrdinals] is what decides the order, and it is deliberately blind to
  * the order this processor discovered them in: `TypeScriptProcessor` walks the

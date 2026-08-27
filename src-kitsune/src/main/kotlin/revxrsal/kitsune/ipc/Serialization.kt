@@ -7,7 +7,7 @@ import kotlinx.serialization.cbor.Cbor
  * The codec both sides of the bridge encode with.
  *
  * CBOR rather than JSON because the payload never has to be read by a human and
- * crosses a JNI boundary as a `byte[]` either way — a JSON reply would mean an
+ * crosses a JNI boundary as a `byte[]` either way. A JSON reply would mean an
  * extra UTF-8 encode on one side and a parse of text on the other, for nothing.
  *
  * `ignoreUnknownKeys` is what lets the Rust and Kotlin halves be versioned
@@ -25,7 +25,7 @@ val KitsuneCbor: Cbor = Cbor {
  * emits.
  *
  * Its declared type is `kotlin.jvm.internal.DefaultConstructorMarker`, which is
- * internal to the stdlib and can never be non-null — the parameter exists only
+ * internal to the stdlib and can never be non-null; the parameter exists only
  * to keep the synthetic overload's JVM signature distinct from the real one.
  * Generated code passes this constant so it does not have to name that type.
  */

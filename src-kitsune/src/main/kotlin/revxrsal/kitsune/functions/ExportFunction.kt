@@ -13,8 +13,8 @@ package revxrsal.kitsune.functions
  * name.
  *
  * The name is not what travels, though. Every export is also given an **ordinal**
- * at generation time — its index into the tables in `GeneratedFunctions`, and
- * into the matching bindings in the generated TypeScript — and that is what the
+ * at generation time, its index into the tables in `GeneratedFunctions` and
+ * into the matching bindings in the generated TypeScript, and that is what the
  * payload carries, in its first two bytes. Dispatch is then an array index
  * rather than a string decode and a hash. The name survives as what the
  * TypeScript binding is called, and as what a diagnostic can name.

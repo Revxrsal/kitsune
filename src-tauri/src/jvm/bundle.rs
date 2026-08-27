@@ -7,7 +7,7 @@
 //!
 //! Anywhere, as it turns out. The cache is recorded against the absolute
 //! classpath in `src-kitsune/dist` (see AotCacheTask), but the JVM validates
-//! classpath entry [0] — the modules image — by name only, so an image unpacked
+//! classpath entry [0] (the modules image) by name only, so an image unpacked
 //! under `~/.cache` still passes. The app jar at entry [1] is checked by name
 //! *and* mtime, so AotCacheTask records it against a zeroed mtime and [`unpack`]
 //! pins the extracted jar back to the exact epoch; otherwise the cache is
@@ -95,7 +95,7 @@ fn unpack(staging: &Path) -> Result<()> {
 
     // The AOT cache is recorded against app.jar's mtime, which AotCacheTask
     // zeroes so it can be reproduced here. tar's mtime round trip is not exact,
-    // though — a zeroed entry comes back out one second past the epoch — and
+    // though: a zeroed entry comes back out one second past the epoch, and
     // under -XX:AOTMode=on even that one-second drift is a fatal "shared class
     // paths mismatch", not a soft downgrade. Pin the jar to the exact epoch the
     // cache expects rather than trusting the archive to carry it through.
@@ -111,7 +111,7 @@ fn unpack(staging: &Path) -> Result<()> {
 /// Deletes every extracted image except this build's.
 ///
 /// Guarded by a lock rather than an age heuristic, because an upgrade replaces
-/// the binary while the previous version may still be running — and that
+/// the binary while the previous version may still be running, and that
 /// process opens files from its image long after startup (`jspawnhelper` on the
 /// first `ProcessBuilder`, resources through jrt-fs). A lock that will not
 /// budge means someone is still in there; leave it for the next launch.

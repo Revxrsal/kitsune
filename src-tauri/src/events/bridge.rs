@@ -28,7 +28,7 @@ impl EventsNativeInterface for EventsAPI {
         ordinal: jint,
         payload: JPrimitiveArray<'local, jbyte>,
     ) -> Result<jboolean, Self::Error> {
-        // Nothing has registered a pump yet — the window is still coming up, or
+        // Nothing has registered a pump yet; the window is still coming up, or
         // it went away. There is nowhere to put this.
         let Some(tx) = EVENT_TX.get() else {
             return Ok(false);
@@ -40,8 +40,8 @@ impl EventsNativeInterface for EventsAPI {
 
         // `jbyte` is `i8`: same size, same alignment, and every bit pattern is
         // valid for both, so this relabels the tail of the buffer rather than
-        // converting it. The alternative — `convert_byte_array` into a `Vec<i8>`
-        // and a cast per element — is a second allocation and a second pass to
+        // converting it. The alternative, `convert_byte_array` into a `Vec<i8>`
+        // and a cast per element, is a second allocation and a second pass to
         // produce the same bytes.
         let body = unsafe {
             std::slice::from_raw_parts_mut(

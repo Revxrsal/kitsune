@@ -25,7 +25,7 @@ import javax.inject.Inject
  * Everything here beyond `--add-modules` exists to make the image smaller. The
  * image is dominated by `lib/server/libjvm.so` (~29 MB) and `lib/modules`
  * (~12 MB), neither of which jlink can shrink much, so the real lever is
- * keeping the module list minimal — which [JdepsModulesTask] already does by
+ * keeping the module list minimal, which [JdepsModulesTask] already does by
  * computing it instead of guessing.
  *
  * Linking is expensive and the module set rarely moves, so [modulesFile] is
@@ -42,7 +42,7 @@ abstract class JlinkTask : DefaultTask() {
      * The toolchain supplying both `bin/jlink` and the `jmods` it links from.
      *
      * `@Nested` rather than a pair of path strings, so the JDK's vendor and
-     * version join the up-to-date check — see [tool]. A JDK upgraded in place
+     * version join the up-to-date check; see [tool]. A JDK upgraded in place
      * would otherwise leave this task reporting up-to-date while the shipped
      * image, and so the AOT cache trained against it, came from the old one.
      */
@@ -64,7 +64,7 @@ abstract class JlinkTask : DefaultTask() {
     /**
      * Path to `objcopy`, used to strip native debug symbols from the shipped
      * `.so` files. Most vendor JDKs (Temurin included) already ship stripped
-     * binaries, so this is usually a no-op — it only pays off on distro builds
+     * binaries, so this is usually a no-op; it only pays off on distro builds
      * that leave symbols in. Left unset, the plugin is skipped.
      */
     @get:Input

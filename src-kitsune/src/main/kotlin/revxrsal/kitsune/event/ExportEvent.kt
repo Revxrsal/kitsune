@@ -8,12 +8,12 @@ package revxrsal.kitsune.event
  * handing it to every matching [Listener].
  *
  * [id] must be unique across the module. Left blank, it is the class's simple
- * name — the package is deliberately not part of it, since the Rust side should
+ * name; the package is deliberately not part of it, since the Rust side should
  * not have to mirror Kotlin's package structure.
  *
  * The id is not what travels, though. Every exported event is also given an
- * **ordinal** at generation time — its index into the tables in
- * `GeneratedEvents`, and into the matching tables in the generated TypeScript —
+ * **ordinal** at generation time, its index into the tables in
+ * `GeneratedEvents` and into the matching tables in the generated TypeScript,
  * and that is what the payload carries, in its first two bytes. Dispatch is then
  * an array index rather than a string decode and a hash. The id survives as the
  * name a diagnostic can use, and as the thing `@Listener(event = ...)` refers to.

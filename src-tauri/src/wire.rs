@@ -1,12 +1,12 @@
 //! How each direction of the bridge names the export or event it is carrying.
 //!
-//! Both directions address by **ordinal** — an index into tables the build
-//! generated for all three languages at once — but they carry it differently,
+//! Both directions address by **ordinal**, an index into tables the build
+//! generated for all three languages at once, but they carry it differently,
 //! because the two transports offer different places to put it.
 //!
 //! **Inbound** (frontend → here) puts it in a request header. Tauri's IPC builds
-//! a `Headers` map on every call regardless — `Content-Type`, `Tauri-Callback`,
-//! `Tauri-Error`, `Tauri-Invoke-Key` — so one more entry rides along on
+//! a `Headers` map on every call regardless (`Content-Type`, `Tauri-Callback`,
+//! `Tauri-Error`, `Tauri-Invoke-Key`), so one more entry rides along on
 //! machinery already paid for, the payload passes through untouched, and reading
 //! it back here allocates nothing.
 //!

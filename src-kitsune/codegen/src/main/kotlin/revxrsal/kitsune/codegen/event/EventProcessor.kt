@@ -103,7 +103,7 @@ class EventProcessor(
             return null
         }
         // An inner class needs an enclosing instance to construct, and nothing on
-        // the host side can supply one. A nested `class` is fine — that is static
+        // the host side can supply one. A nested `class` is fine; that is static
         // in Kotlin.
         if (Modifier.INNER in declaration.modifiers) {
             logger.error("@ExportEvent cannot be applied to an inner class.", declaration)
@@ -122,7 +122,7 @@ class EventProcessor(
             return null
         }
         // The generated registration hands the class to serializer<T>(), which
-        // resolves at compile time — so a missing @Serializable surfaces as an
+        // resolves at compile time, so a missing @Serializable surfaces as an
         // error inside generated code, where the source location is useless.
         if (!declaration.hasAnnotation(SERIALIZABLE_ANNOTATION)) {
             logger.error(
@@ -179,7 +179,7 @@ class EventProcessor(
         // event, and there is no second argument for the host to omit.
         val parameter = function.parameters.singleOrNull() ?: run {
             logger.error(
-                "A @Listener function must take exactly one parameter — the event — but takes " +
+                "A @Listener function must take exactly one parameter, the event, but takes " +
                     "${function.parameters.size}.",
                 declaration,
             )
@@ -206,8 +206,8 @@ class EventProcessor(
         // Only reachable through an explicit @Listener(event = ...): the fallback
         // above reads the id off a registered event, so it cannot miss. It is an
         // error rather than a silently dead listener because the tables are
-        // indexed by ordinal now — an id with no event behind it has no row to
-        // live in, so there is nowhere to put it even in principle.
+        // indexed by ordinal now, and an id with no event behind it has no row
+        // to live in, so there is nowhere to put it even in principle.
         if (id !in knownIds) {
             logger.error(
                 "No @ExportEvent is registered under id '$id'. Known: ${knownIds.sorted()}.",
@@ -229,7 +229,7 @@ class EventProcessor(
 }
 
 /**
- * Orders the events by ordinal — index in the returned list *is* the ordinal.
+ * Orders the events by ordinal: index in the returned list *is* the ordinal.
  *
  * [assignOrdinals] is what decides the order, and it is deliberately blind to
  * the order this processor discovered them in: `TypeScriptProcessor` walks the

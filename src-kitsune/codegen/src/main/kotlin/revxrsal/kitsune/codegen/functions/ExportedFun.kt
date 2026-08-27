@@ -29,7 +29,7 @@ import revxrsal.kitsune.codegen.util.ContinuationClass
 import revxrsal.kitsune.codegen.util.DecodeStructure
 import revxrsal.kitsune.codegen.util.DecoderClass
 import revxrsal.kitsune.codegen.util.DefaultConstructorMarkerType
-import revxrsal.kitsune.codegen.util.DeserializationStrategyClass
+import revxrsal.kitsune.codegen.util.SerializerStrategyClass
 import revxrsal.kitsune.codegen.util.INT_TYPE_BLOCK
 import revxrsal.kitsune.codegen.util.JavaObjectType
 import revxrsal.kitsune.codegen.util.LambdaMetafactoryClass
@@ -56,7 +56,7 @@ private const val DESCRIPTOR = "descriptor"
  * An `@ExportFunction` (or `@Listener`) declaration, with everything the
  * generated wrapper needs derived from it.
  *
- * [containingJavaClass] is the JVM class the function compiles into —
+ * [containingJavaClass] is the JVM class the function compiles into:
  * `FooKt` for a top-level function, the object's own class for a member. It is
  * only needed to locate the synthetic `$default` method, and KSP has to supply
  * it because that name is a compiler detail with no Kotlin-level equivalent.
@@ -84,9 +84,9 @@ class ExportedFun(
     /**
      * Whether the target is a `suspend` function.
      *
-     * This changes the synthetic method's JVM signature in three places — an
+     * This changes the synthetic method's JVM signature in three places (an
      * appended `Continuation`, an `Object` return regardless of what Kotlin
-     * declares, and a call that has to hand over the caller's continuation — so
+     * declares, and a call that has to hand over the caller's continuation), so
      * it is threaded through rather than re-derived at each site.
      */
     val isSuspend = Modifier.SUSPEND in function.modifiers
@@ -97,7 +97,7 @@ class ExportedFun(
  *
  * Spelled out in full rather than emitted as a `MemberName`, which would add an
  * import. Every wrapper shares its name with the function it wraps, and an
- * explicit import wins over a same-package declaration in Kotlin resolution — so
+ * explicit import wins over a same-package declaration in Kotlin resolution, so
  * importing the target silently shadows the wrapper, and `::name` in the
  * registry then resolves to the user's function with the wrong signature.
  */
@@ -108,8 +108,8 @@ val ExportedFun.callSite: CodeBlock
 /**
  * The serial name of this function's argument descriptor.
  *
- * Only ever seen in a `SerializationException` message — there is no class by
- * this name any more — so it is named after the shape it describes rather than
+ * Only ever seen in a `SerializationException` message (there is no class by
+ * this name any more), so it is named after the shape it describes rather than
  * after the wrapper.
  */
 val ExportedFun.argumentsSerialName get() = "Args_$name"
@@ -186,7 +186,7 @@ fun ExportedFun.addTo(file: FileSpec.Builder, serializers: SerializerCache) {
     }
 
     // Everything generated around the parameters shares their namespace, so all
-    // of it is allocated from one allocator — otherwise a parameter called
+    // of it is allocated from one allocator; otherwise a parameter called
     // `mask0` or `marker` collides with the machinery built around it.
     //
     // `descriptor` is reserved first because it is the one name that cannot
@@ -238,8 +238,8 @@ fun ExportedFun.addTo(file: FileSpec.Builder, serializers: SerializerCache) {
  * The check exists because it is no longer free. A plugin-generated
  * `@Serializable` decoder raises `MissingFieldException` for a required property
  * on its own; a hand-written one is handed the element indices the payload
- * carried and nothing else, so the same guarantee has to be spelled out — and
- * without it `add(a: Int, b: Int)` would answer `{a: 1}` with `b = 0` rather
+ * carried and nothing else, so the same guarantee has to be spelled out.
+ * Without it, `add(a: Int, b: Int)` would answer `{a: 1}` with `b = 0` rather
  * than an error.
  *
  * It runs before the mask is consulted for anything else, which is what lets
@@ -288,15 +288,15 @@ private fun ExportedFun.checkRequiredArguments(
  * Hand-written rather than left to `@Serializable`, for the one thing the
  * plugin-generated decoder cannot report: *which keys the payload carried*. It
  * yields a value per property, and an absent key and an explicit null both
- * arrive as `null` — so a parameter that is nullable and defaulted has no way to
- * tell "use the default" from "the host really means null". `decodeElementIndex`
+ * arrive as `null`, so a parameter that is nullable and defaulted has no way
+ * to tell "use the default" from "the host really means null". `decodeElementIndex`
  * visits only the keys that were actually present, so the mask falls out of the
  * decode that was happening anyway, exact and free.
  *
  * An anonymous object rather than a named class, with the decoded values as
  * fields on it rather than as captured locals. Captured `var`s would each be
- * boxed into a `Ref` — one allocation per parameter, per call, on top of the
- * decoder — whereas fields make it a single object the wrapper reads straight
+ * boxed into a `Ref` (one allocation per parameter, per call, on top of the
+ * decoder), whereas fields make it a single object the wrapper reads straight
  * out of. It is also why nothing here is a `KSerializer`: only [deserialize] is
  * ever reached, and `Unit` is the honest return type for a decoder that writes
  * its results into itself.
@@ -336,7 +336,7 @@ private fun ExportedFun.createDecoder(
     }
 
     return TypeSpec.anonymousClassBuilder()
-        .addSuperinterface(DeserializationStrategyClass.parameterizedBy(UNIT))
+        .addSuperinterface(SerializerStrategyClass.parameterizedBy(UNIT))
         .addProperties(parameters.map { it.toDecoderField(fields.getValue(it)) })
         .addProperties(masker.fields())
         .addProperty(
@@ -366,7 +366,7 @@ private fun ExportedFun.createDecoder(
  * initialisation, which matters for a module whose classes are linked ahead of
  * time by the AOT training pass.
  *
- * Element order is what the mask is indexed by — element *i* is parameter *i* —
+ * Element order is what the mask is indexed by (element *i* is parameter *i*),
  * so it must follow the declaration and not, say, the alphabet.
  */
 private fun ExportedFun.createDescriptorProperty(): PropertySpec {
@@ -406,7 +406,7 @@ private fun ExportedFun.callDirectly(
  * synthetic returns either the result or the `COROUTINE_SUSPENDED` sentinel, and
  * that is exactly the contract the intrinsic's block is defined by. So the
  * caller's own continuation goes straight into the `Continuation` slot and the
- * sentinel is propagated untouched — the same handoff the compiler emits for an
+ * sentinel is propagated untouched, the same handoff the compiler emits for an
  * ordinary suspend call, with no extra frame, no wrapper continuation and no
  * dispatch.
  */
@@ -456,8 +456,8 @@ private fun ExportedFun.callThroughSynthetic(
  *
  * `Unit` is encoded as zero bytes rather than through its serializer: it carries
  * no information, and an empty reply is what the host can most cheaply detect.
- * It also must not be bound to a local — a `Unit`-typed `val result` is an
- * unused-variable warning in every generated wrapper that has one.
+ * It also must not be bound to a local, because a `Unit`-typed `val result` is
+ * an unused-variable warning in every generated wrapper that has one.
  */
 private fun CodeBlock.Builder.emitResult(
     function: ExportedFun,
@@ -472,7 +472,7 @@ private fun CodeBlock.Builder.emitResult(
     emitEncodedReturn(function, serializers)
 }
 
-/** Returns `result`, encoded — or zero bytes when there is nothing to encode. */
+/** Returns `result`, encoded, or zero bytes when there is nothing to encode. */
 private fun CodeBlock.Builder.emitEncodedReturn(
     function: ExportedFun,
     serializers: SerializerCache,
@@ -481,7 +481,7 @@ private fun CodeBlock.Builder.emitEncodedReturn(
         addStatement("return ByteArray(0)")
     } else {
         // Cached for the same reason the element serializers are: a return type
-        // that is not a plain builtin — `List<String>`, a nullable — resolves to
+        // that is not a plain builtin (`List<String>`, a nullable) resolves to
         // a constructor call, and inline it would run on every reply.
         addStatement(
             "return %M.encodeToByteArray(%L, result)",
@@ -494,14 +494,14 @@ private fun CodeBlock.Builder.emitEncodedReturn(
 /**
  * The functional interface the synthetic `$default` method is bound to.
  *
- * Its signature mirrors the synthetic's exactly — receiver first for an object
+ * Its signature mirrors the synthetic's exactly: receiver first for an object
  * member, then the declared parameters, then one `Int` mask per 32 of them, then
  * the marker. That exactness is the point: it makes the call site a plain
  * interface call the JIT can inline, with primitives passed unboxed and no
  * `Array<Any?>` built per invocation, which is what `Method.invoke` costs.
  *
  * Reference-typed parameters are widened to nullable. At the JVM level that
- * changes nothing — the descriptor is the same — but an omitted argument is
+ * changes nothing (the descriptor is the same), but an omitted argument is
  * passed as `null` here, and a non-null Kotlin parameter would reject it at
  * compile time.
  *
@@ -510,7 +510,7 @@ private fun CodeBlock.Builder.emitEncodedReturn(
  *
  * - a raw `Continuation` sits between the declared parameters and the masks;
  * - the return type is `Any?`, because a suspend function returns `Object` at
- *   the JVM level — its declared type *or* the `COROUTINE_SUSPENDED` sentinel.
+ *   the JVM level: its declared type *or* the `COROUTINE_SUSPENDED` sentinel.
  *   That holds even when it declares `Unit`, so this interface method is not
  *   `Unit`-returning and must not be generated as one.
  *
@@ -548,8 +548,8 @@ private fun ExportedFun.createSyntheticInterface(
 /**
  * Binds the synthetic method to [syntheticInterface] through
  * `LambdaMetafactory`, the same machinery the JVM uses for `invokedynamic`
- * lambdas — so the result is an ordinary object with a direct call to the target,
- * not a reflective dispatch.
+ * lambdas, so the result is an ordinary object with a direct call to the
+ * target, not a reflective dispatch.
  *
  * `lazy` because the binding costs a lookup and a spun class: a function that is
  * never called with omitted arguments never pays for it, and nothing here runs
@@ -567,7 +567,7 @@ private fun ExportedFun.createSyntheticProperty(masker: Masker): PropertySpec {
         add(DefaultConstructorMarkerType)
     }.joinToCode(", ")
 
-    // A suspend function returns Object at the JVM level whatever it declares —
+    // A suspend function returns Object at the JVM level whatever it declares,
     // including Unit, where a non-suspend function would return void.
     val returnClass = if (isSuspend) JavaObjectType else returnType.asReturnTypeBlock()
 

@@ -74,7 +74,7 @@ impl Drop for Guard {
 /// Hands `body` to the Kotlin export at `ordinal` and awaits its reply.
 ///
 /// `ordinal` rather than a name: it is already an `i32` by the time it gets here,
-/// so nothing is allocated on the way in — where a name meant a `NewStringUTF`
+/// so nothing is allocated on the way in, where a name meant a `NewStringUTF`
 /// per call, and a hash lookup on the other side, to identify a function the
 /// build had already numbered.
 pub async fn call_kotlin(ordinal: jint, body: &[u8]) -> KotlinResult {

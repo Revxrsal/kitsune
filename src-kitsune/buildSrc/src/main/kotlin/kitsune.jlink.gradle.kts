@@ -31,13 +31,35 @@ val kitsune = extensions.create<KitsuneExtension>("kitsune").apply {
             "/java.base/lib/jexec",
         )
     )
-    obfuscate.convention(true)
     proguardVersion.convention("7.10.0")
 }
 
-// Set outside the apply block so `layout` resolves against the project rather
-// than the extension receiver.
+// Set outside the apply block so `layout` and `providers` resolve against the
+// project rather than the extension receiver.
 kitsune.obfuscationRules.convention(layout.projectDirectory.file("proguard-rules.pro"))
+
+// `-Pkitsune.obfuscate=false` is how a build that is not going to ship opts out
+// of the ProGuard pass; src-tauri/build.rs passes it on every non-embedding
+// (debug) build, which is where the pass is pure cost. Shipping stays the
+// default, so a bare `./gradlew dist` and anything driving `assemble` still
+// obfuscate without being told to.
+//
+// A convention rather than a set(), so the layering reads explicit `kitsune {
+// obfuscate.set(..) }` > -P > on. Someone who pins it in the build script means
+// it, including for debug builds.
+//
+// Parsed strictly rather than with String.toBoolean(), which maps every typo to
+// false: the failure that would hide is a release that silently shipped
+// un-renamed, which is the one worth being loud about.
+kitsune.obfuscate.convention(
+    providers.gradleProperty("kitsune.obfuscate").map {
+        when (it) {
+            "true" -> true
+            "false" -> false
+            else -> error("-Pkitsune.obfuscate expects true or false, got '$it'")
+        }
+    }.orElse(true)
+)
 
 // jdeps/jlink are taken from the project's Java toolchain, not from PATH, so
 // the tools always match the version the code is compiled against.
@@ -45,7 +67,7 @@ kitsune.obfuscationRules.convention(layout.projectDirectory.file("proguard-rules
 // Handed to the tasks as the launcher itself rather than as a path, because the
 // tasks declare it @Nested: what they key on is then the JDK's vendor and
 // version, not where it happens to be installed. A JDK upgraded in place at a
-// stable path is the case that matters — see kitsune.tool.
+// stable path is the case that matters; see kitsune.tool.
 val javaLauncher = extensions.getByType<JavaToolchainService>()
     .launcherFor(java.toolchain)
 
@@ -73,7 +95,7 @@ dependencies.addProvider(
     kitsune.proguardVersion.map { "com.guardsquare:proguard-base:$it" }
 )
 
-// The obfuscated (or, when disabled, copied) jar the app ships — the sole
+// The obfuscated (or, when disabled, copied) jar the app ships, and the sole
 // producer of dist/lib/app.jar. Everything that used to read the shadow jar as
 // "the app jar" reads this instead, so the shipped bytes are always the ones
 // that went through here. jdeps stays on the shadow jar deliberately: it only
@@ -158,21 +180,22 @@ val verifyAotCache = tasks.register<VerifyAotCacheTask>("verifyAotCache") {
 
 val dist = tasks.register("dist") {
     group = "distribution"
-    description = "Assembles dist/ — trimmed runtime, jar, AOT cache, VM options."
+    description = "Assembles dist/: trimmed runtime, jar, AOT cache, VM options."
     dependsOn(jlinkRuntime, writeVmOptions, aotCache, verifyAotCache)
 }
 
 // The AOT cache records the classpath it was trained on, so it has to be built
 // against the jar at the path the host will actually load.
 //
-// That path is dist/lib/app.jar, and the `obfuscate` task is its one producer —
-// the shadow jar is now an intermediate that lands in the default build/libs and
-// is never loaded by anyone. That keeps the drift the old layout guarded against
-// unrepresentable: there is a single dist/lib/app.jar, and a bare `gradlew
-// shadowJar` or an IDE build still ends at it, because the finalizer below pulls
-// the whole chain (obfuscate -> aotCache) through on every jar rebuild.
+// That path is dist/lib/app.jar, and the `obfuscate` task is its one producer.
+// The shadow jar is now an intermediate that lands in the default build/libs
+// and is never loaded by anyone. That keeps the drift the old layout guarded
+// against unrepresentable: there is a single dist/lib/app.jar, and a bare
+// `gradlew shadowJar` or an IDE build still ends at it, because the finalizer
+// below pulls the whole chain (obfuscate -> aotCache) through on every jar
+// rebuild.
 shadowJar {
-    // Rebuilding the jar without rebuilding the cache is not a lost speedup —
+    // Rebuilding the jar without rebuilding the cache is not a lost speedup;
     // it silently runs the OLD code. The JVM does not protect you here: with
     // -Xlog:class+path=trace it records the app jar as classpath entry [1] and
     // then validates only entry [0], the modules image. A changed app jar passes
@@ -187,11 +210,11 @@ shadowJar {
 
 // The AOT cache is not an optional post-build step. The host runs with
 // -XX:AOTMode=on and will not start without a valid cache, so a build that did
-// not produce one is not a build — hence `assemble`, not a task you remember to
-// run.
+// not produce one is not a build, hence `assemble` rather than a task you
+// remember to run.
 //
 // Changing kitsune.vmOptions re-records the cache rather than breaking it, so
-// verifyAotCache is not there to catch drift between the two lists — that is
+// verifyAotCache is not there to catch drift between the two lists; that is
 // what generating both from one source already prevents. It catches the case
 // where the cache is built successfully and still does not engage: a flag
 // combination that leaves aot-linking disabled, a toolchain bump that

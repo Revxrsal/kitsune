@@ -14,7 +14,7 @@ val SerializerFunction = MemberName("kotlinx.serialization", "serializer")
  * A decoder is hand-written rather than left to `@Serializable` because the
  * plugin-generated one cannot answer the question the wrapper actually has to
  * ask. It decodes a *value* per property, and a property that was absent and a
- * property that was explicitly null both arrive as `null` — which is precisely
+ * property that was explicitly null both arrive as `null`, which is precisely
  * the distinction the default-argument mask is built from. `decodeElementIndex`
  * visits only the keys the payload really carried, so writing the loop out by
  * hand recovers presence for free, during the decode that was happening anyway.
@@ -25,7 +25,7 @@ val SerializerFunction = MemberName("kotlinx.serialization", "serializer")
  */
 val ExperimentalSerializationApiClass =
     ClassName("kotlinx.serialization", "ExperimentalSerializationApi")
-val DeserializationStrategyClass = ClassName("kotlinx.serialization", "DeserializationStrategy")
+val SerializerStrategyClass = ClassName("kotlinx.serialization", "Serializer")
 val SerializationExceptionClass = ClassName("kotlinx.serialization", "SerializationException")
 
 val SerialDescriptorClass = ClassName("kotlinx.serialization.descriptors", "SerialDescriptor")

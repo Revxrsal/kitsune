@@ -4,7 +4,7 @@ package revxrsal.kitsune.codegen.rust
  * The `@KitsuneEntrypoint` declaration, in the three spellings the generated
  * Rust needs.
  *
- * [internalName] is the JNI internal form — `revxrsal/kitsune/App`, what
+ * [internalName] is the JNI internal form `revxrsal/kitsune/App`, what
  * `FindClass` and `new_object` take. [binaryName] is the same name in the dotted
  * form `Class.forName` expects, nested classes still joined by `$`. They differ
  * only in the separator, but each JNI entry point accepts exactly one of them
@@ -25,18 +25,18 @@ class Entrypoint(
  *
  * ## Two shapes, because Kotlin has two singletons
  *
- * What the host has to trigger is `KitsuneApplication`'s initializer — that is
+ * What the host has to trigger is `KitsuneApplication`'s initializer, which is
  * what publishes the `application` instance every later bridge call is
  * dispatched through. Which JNI call triggers it depends on the declaration:
  *
  * - A **class** is instantiated. `new_object` with a `()V` descriptor runs the
  *   constructor, and the constructor runs the base class's `init` block. (`()V`
- *   and not `()L<class>;` — `new_object` rejects a non-void constructor
+ *   and not `()L<class>;`, because `new_object` rejects a non-void constructor
  *   descriptor at runtime, with `InvalidCtorReturn`.)
  * - An **object** is *already* the instance. Its `INSTANCE` field is assigned in
  *   the class initializer, so the object is constructed the moment the class is
  *   initialized, and there is nothing for the host to call. So the generated
- *   code loads the class with `initialize = true` and stops there — through
+ *   code loads the class with `initialize = true` and stops there, through
  *   `LoaderContext::load_class`, which reaches `Class.forName(name, true,
  *   loader)`, the one lookup that *specifies* initialization. `FindClass`
  *   initializes on HotSpot as well, but only as an implementation detail, and a
@@ -89,7 +89,7 @@ $imports
 /// Hands control to the Kotlin side.
 ///
 /// This is what runs `KitsuneApplication`'s initializer, and that initializer is
-/// what installs the singleton every later bridge call is dispatched through —
+/// what installs the singleton every later bridge call is dispatched through,
 /// so this has to run, once, on an attached thread, before the first call can
 /// arrive.
 ///

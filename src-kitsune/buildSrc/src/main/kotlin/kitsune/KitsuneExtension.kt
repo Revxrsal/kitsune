@@ -11,7 +11,7 @@ import org.gradle.api.provider.Provider
  *
  * Those settings are declared here rather than in a `ksp { }` block so
  * that everything about "how this module becomes an app" is configured in one
- * place. The convention plugin does not read them — the root build passes them
+ * place. The convention plugin does not read them; the root build passes them
  * on to KSP as processor options, which is the only channel a processor has.
  */
 abstract class KitsuneExtension {
@@ -21,7 +21,7 @@ abstract class KitsuneExtension {
      * `@ExportFunction` and `@ExportEvent` into.
      *
      * It lives outside this Gradle project, in the frontend's source tree, and
-     * is overwritten in place on every build that changes the exported surface —
+     * is overwritten in place on every build that changes the exported surface,
      * so point it at a generated file and check it in only as one.
      *
      * Left unset, no bindings are generated at all.
@@ -40,8 +40,8 @@ abstract class KitsuneExtension {
     /**
      * The Rust file the codegen writes the `@KitsuneEntrypoint` handover into.
      *
-     * Like [bindings], it lives outside this Gradle project — in the Rust host's
-     * source tree — and is overwritten in place whenever the annotated class
+     * Like [bindings], it lives outside this Gradle project, in the Rust host's
+     * source tree, and is overwritten in place whenever the annotated class
      * moves or is renamed. The host names that class as a JNI string, so this is
      * what keeps the string and the Kotlin declaration from drifting apart.
      *
@@ -53,7 +53,7 @@ abstract class KitsuneExtension {
     /**
      * VM flags shared by the AOT training runs and the host process that calls
      * `JNI_CreateJavaVM`. These are written to `dist/lib/vmoptions.txt`, which
-     * the host reads at startup — a single source of truth, because several of
+     * the host reads at startup: a single source of truth, because several of
      * these flags invalidate the AOT cache if the two sides disagree.
      *
      * Do not put paths in here. The host appends `-Djava.class.path` and
@@ -65,7 +65,7 @@ abstract class KitsuneExtension {
      * [vmOptions] plus the flags that only make sense when *consuming* a cache.
      *
      * `-XX:AOTMode=on` is the one that matters: the default `auto` mode treats a
-     * rejected cache as a soft downgrade — it logs the reason and starts anyway,
+     * rejected cache as a soft downgrade. It logs the reason and starts anyway,
      * so a mismatch reaches production looking like nothing more than a lost
      * speedup. `on` turns that into a refusal to initialize the VM at all.
      *
@@ -89,10 +89,14 @@ abstract class KitsuneExtension {
      *
      * This is name obfuscation, not a security boundary: the goal is only to
      * make the compiled Kotlin more tedious to read, and anyone determined can
-     * still recover the extracted jar. Defaults to on. The convention plugin
-     * routes the jar through ProGuard either way — see [ProGuardTask] — so
-     * flipping this off produces the same `dist/lib/app.jar` layout, just
-     * un-renamed.
+     * still recover the extracted jar. The convention plugin routes the jar
+     * through ProGuard either way (see [ProGuardTask]), so flipping this off
+     * produces the same `dist/lib/app.jar` layout, just un-renamed.
+     *
+     * Defaults to on, overridable per invocation with `-Pkitsune.obfuscate`.
+     * Setting it here wins over that flag, so pinning it in the `kitsune { }`
+     * block also opts the debug builds that pass `-Pkitsune.obfuscate=false`
+     * back into the ~10s pass they were skipping.
      */
     abstract val obfuscate: Property<Boolean>
 
@@ -101,8 +105,8 @@ abstract class KitsuneExtension {
      *
      * Defaults to `proguard-rules.pro` beside the build script. Its job is to
      * exempt the closed set of names the Rust host and the JVM launcher resolve
-     * by string — the JNI bridge, the `@KitsuneEntrypoint` class, the AOT
-     * training main — from renaming; everything else is fair game.
+     * by string (the JNI bridge, the `@KitsuneEntrypoint` class, the AOT
+     * training main) from renaming; everything else is fair game.
      */
     abstract val obfuscationRules: RegularFileProperty
 
@@ -110,8 +114,8 @@ abstract class KitsuneExtension {
      * The `com.guardsquare:proguard-base` version to run.
      *
      * Pinned here rather than in the plugin so a bump for a newer class-file
-     * version — ProGuard has to be able to *read* the bytecode the toolchain
-     * emits — is a one-line change in the `kitsune { }` block.
+     * version (ProGuard has to be able to *read* the bytecode the toolchain
+     * emits) is a one-line change in the `kitsune { }` block.
      */
     abstract val proguardVersion: Property<String>
 }

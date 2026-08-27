@@ -21,7 +21,7 @@ object NativeEventBridge {
      * the frame to the frontend.
      *
      * Returns whether the host took it. It answers `false` when the outbound queue
-     * is full — the call is made from whatever thread raised the event, and the
+     * is full: the call is made from whatever thread raised the event, and the
      * host will not block that thread on a webview that has stopped draining.
      */
     @JvmStatic

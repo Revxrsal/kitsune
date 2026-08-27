@@ -9,7 +9,7 @@ import com.squareup.kotlinpoet.MemberName
  * Named rather than referenced, for the same cycle reason as [Annotations]: the
  * processor cannot depend on the module it processes. KotlinPoet only needs the
  * name to emit a correct import, and the Kotlin compiler resolves it for real
- * when it compiles the generated file — so a rename here surfaces as an
+ * when it compiles the generated file, so a rename here surfaces as an
  * unresolved reference in generated code, not as a silent miscompile.
  */
 object Runtime {
@@ -44,7 +44,7 @@ object Runtime {
 val ContinuationClass = ClassName("kotlin.coroutines", "Continuation")
 
 /**
- * `suspendCoroutineUninterceptedOrReturn` — the intrinsic that hands a suspend
+ * `suspendCoroutineUninterceptedOrReturn`, the intrinsic that hands a suspend
  * function its caller's continuation.
  *
  * "Unintercepted" is correct rather than a shortcut: interception happens once,

@@ -21,7 +21,7 @@ import javax.inject.Inject
  * A rejected AOT cache fails *open*: the JVM logs the reason and then starts
  * normally, so without this check a mismatch shows up as "no speedup" and
  * nothing else. `-Xlog:aot` carries the verdict; `-Xlog:class+load` proves the
- * application's own classes — not just the JDK's — came out of the cache.
+ * application's own classes, not just the JDK's, came out of the cache.
  */
 abstract class VerifyAotCacheTask : DefaultTask() {
 

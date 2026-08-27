@@ -5,7 +5,7 @@
 **Write your Tauri backend in Kotlin.**
 
 A highly optimized Kotlin runtime bolted onto Tauri, with all the glue you need
-to write your entire backend in Kotlin — invokable directly from your frontend,
+to write your entire backend in Kotlin, invokable directly from your frontend,
 fully typed, with zero IPC boilerplate.
 
 </div>
@@ -38,7 +38,7 @@ const page = await fetchFromUrl({ url: 'https://github.com' })
 
 No command names to register, no JSON schemas to keep in sync, no hand-written
 IPC. A KSP processor reads your Kotlin at compile time and writes all three
-halves of the bridge — the Kotlin dispatch registry, the TypeScript bindings,
+halves of the bridge: the Kotlin dispatch registry, the TypeScript bindings,
 and the Rust JNI handover. None of them is written by hand, so none of them can
 drift.
 
@@ -46,33 +46,34 @@ drift.
 
 Tauri gives you a tiny, fast shell and a real webview. Rust gives you a fast
 host. What neither gives you is the language most application logic is
-comfortable in — one with coroutines, null safety, data classes, default
+comfortable in, one with coroutines, null safety, data classes, default
 arguments and a huge library ecosystem. Kitsune bolts a Kotlin runtime onto a
 Tauri app and makes it feel native to both sides.
 
 **First-class Kotlin, not a lowest-common-denominator FFI.** Default arguments,
-`suspend` functions, coroutines, nullable types, `object` members — all of them
-cross the wire and behave exactly as you'd expect. Exports are driven entirely
+`suspend` functions, coroutines, nullable types and `object` members all cross
+the wire and behave exactly as you'd expect. Exports are driven entirely
 by annotations.
 
 **Fast by construction.** Every layer of the bridge was benchmarked and then
 rewritten around what the numbers said:
 
-1. **CBOR, not JSON** for JS ⟷ Rust ⟷ Kotlin — the payload crosses as bytes either way, so there's no reason to make a human-readable format nobody reads.
-2. **No intermediary representation.** Arguments are encoded once in the frontend and decoded once in Kotlin — no serde value, no JSON string, no map in between.
+1. **CBOR, not JSON** for JS ⟷ Rust ⟷ Kotlin. The payload crosses as bytes either way, so there's no reason to make a human-readable format nobody reads.
+2. **No intermediary representation.** Arguments are encoded once in the frontend and decoded once in Kotlin. No serde value, no JSON string, no map in between.
 3. **Zero extra allocations on the call path.** Nothing is copied, stringified or boxed just to move a call across and its result back.
 4. **Integer ordinals, not strings.** Function and event calls are addressed by ordinal, so dispatch allocates nothing.
 5. **No reflection.** Every serializer, decoder and dispatch table is generated at compile time (like serde), never discovered at runtime.
-6. **A trimmed, pre-warmed JVM.** The runtime that ships is a `jlink` image containing only the modules your code uses, carrying an AOT cache recorded at build time and compressed with `zstd` — embedded straight into the Tauri binary.
+6. **A trimmed, pre-warmed JVM.** The runtime that ships is a `jlink` image containing only the modules your code uses, carrying an AOT cache recorded at build time and compressed with `zstd`, then embedded straight into the Tauri binary.
 
 **Obfuscated on the way out.** The shipped jar is run through ProGuard before it
 is embedded, so the compiled Kotlin ships renamed rather than in the clear. The
-handful of names the Rust host and the JVM resolve by string — the
-`@KitsuneEntrypoint` class, the JNI bridge, the AOT training main — are held
+handful of names the Rust host and the JVM resolve by string (the
+`@KitsuneEntrypoint` class, the JNI bridge, the AOT training main) are held
 back from the rename; everything else is mangled, and `@kotlin.Metadata` is
 stripped so the original names cannot be read straight back out. This is name
-obfuscation, not a security boundary — a speed bump for reverse engineering, on
-by default and switchable off. See [Configuration](#configuration).
+obfuscation, not a security boundary. It is a speed bump for reverse
+engineering, on by default and switchable off. See
+[Configuration](#configuration).
 
 ## What it looks like
 
@@ -252,7 +253,7 @@ build that cannot produce a working cache fails instead of shipping a slow app.
 
 A JVM inside a desktop app invites one question ahead of every other: what does
 it cost in RAM? For the sample app, idle with its window open, the answer is
-about **120 MB resident** — and the JVM is the smaller half of that.
+about **120 MB resident**, and the JVM is the smaller half of that.
 
 | | |
 | --- | --- |
@@ -276,28 +277,28 @@ kitsune.exe      Rust host + JVM      29.4 MB   (24%)
 ```
 
 There is no `java.exe`. The JVM is created in-process through the invocation
-API, so the whole Kotlin runtime — heap, metaspace, code cache, 18 threads —
+API, so the whole Kotlin runtime (heap, metaspace, code cache, 18 threads)
 lives inside the same 29 MB as the Rust host. The webview costs three times what
 the language runtime does.
 
 `jcmd`, attached to a running app, shows why it stays there: after a forced GC
 the live heap is 1.1 MB, metaspace 2.2 MB used, code cache 1.6 MB used. Almost
 all of the 29 MB is fixed JVM overhead rather than anything the app allocated,
-which is the shape you want — it does not scale with how much Kotlin you write,
+which is the shape you want. It does not scale with how much Kotlin you write,
 only with how much of it is live at once.
 
 **Committed is not resident.** Task Manager's *Commit size* tells a scarier
 story: +864 MB for the tree, 544 MB of it `kitsune.exe`. That is `-Xmx512m` with
 no `-Xms`, so HotSpot's ergonomics pick an initial heap of 1/64 of physical RAM
-— 510 MB here — and commit all of it up front to hold a 1.1 MB live set. Those
+(510 MB here) and commit all of it up front to hold a 1.1 MB live set. Those
 pages are never touched, so they cost address space and commit charge rather
 than memory. Adding `-Xms32m` to `vmOptions` drops roughly 480 MB of commit
 without moving the resident figure; it re-records the AOT cache, which the build
 does for you. The tree's *total* working set, 432 MB, is not a useful number at
 all: it counts every shared DLL page once per WebView2 process.
 
-> **About these numbers.** They come from one machine — Windows 11 Pro 26200,
-> i5-13400F, 32 GB RAM, WebView2 151.0.4129.107 — running the installed release
+> **About these numbers.** They come from one machine (Windows 11 Pro 26200,
+> i5-13400F, 32 GB RAM, WebView2 151.0.4129.107) running the installed release
 > build of the sample app, warm, idle at its window, with the whole process tree
 > sampled every 500 ms for 60 s. A benchmark is a snapshot of one workload on
 > one configuration: your heap, your webview content, your OS and your GPU will
@@ -423,8 +424,8 @@ kitsune {
 }
 ```
 
-The jar is run through ProGuard whether or not obfuscation is enabled — with it
-off the jar is copied through untouched — so the same `dist/lib/app.jar` layout
+The jar is run through ProGuard whether or not obfuscation is enabled (with it
+off the jar is copied through untouched), so the same `dist/lib/app.jar` layout
 is produced either way and the AOT cache always trains against the jar that
 actually ships. The default rules keep it to renaming only (`-dontshrink
 -dontoptimize`); shrinking and optimization are yours to enable once you have

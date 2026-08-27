@@ -7,7 +7,7 @@ import {Channel, invoke} from '@tauri-apps/api/core'
  * Mirrors `ORDINAL_BYTES` in `src-tauri/src/wire.rs`, and applies to that
  * direction only: events pushed down the pump arrive on a channel that carries
  * nothing but bytes, so there is nowhere else to put the ordinal. Outbound, it
- * rides in a header — see `headerOf`.
+ * rides in a header; see `headerOf`.
  */
 const ORDINAL_BYTES = 2
 
@@ -33,8 +33,8 @@ const headerValues: string[] = []
 /**
  * The ordinal as a header value.
  *
- * Outbound payloads go to Tauri exactly as cbor-x encoded them — no prefix, so
- * no second buffer and no copy — and the ordinal travels in a header instead.
+ * Outbound payloads go to Tauri exactly as cbor-x encoded them (no prefix, so
+ * no second buffer and no copy), and the ordinal travels in a header instead.
  * That is close to free: Tauri's IPC constructs a `Headers` map on every call
  * regardless (`Content-Type`, `Tauri-Callback`, `Tauri-Error`,
  * `Tauri-Invoke-Key`), so one more entry rides on machinery already paid for.
@@ -76,8 +76,8 @@ export const Bridge = {
    * Raises an event: Kotlin's `@Listener`s run, and so do the local ones.
    *
    * The local half is not a round trip. Kotlin never echoes a frontend-raised
-   * event back — that is what `EventSource.JAVASCRIPT` suppresses, and it has to,
-   * or every emit would come home again — so the frontend's own subscribers are
+   * event back; that is what `EventSource.JAVASCRIPT` suppresses, and it has to,
+   * or every emit would come home again. So the frontend's own subscribers are
    * this side's job to notify, and they get the object as passed rather than a
    * decode of it.
    *
@@ -94,8 +94,8 @@ export const Bridge = {
   /**
    * Subscribes to the event at `ordinal`; call the result to stop.
    *
-   * Local bookkeeping only — the pump is registered once, for every event at
-   * once — so this is synchronous and cannot fail.
+   * Local bookkeeping only (the pump is registered once, for every event at
+   * once), so this is synchronous and cannot fail.
    */
   listen: (ordinal: number, handler: Handler): Unlisten => {
     const row = subscribers[ordinal] ?? (subscribers[ordinal] = [])

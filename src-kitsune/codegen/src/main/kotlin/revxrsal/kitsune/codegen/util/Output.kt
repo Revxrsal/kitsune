@@ -8,11 +8,11 @@ import java.io.File
  *
  * Used by the processors that generate for the other two languages, which write
  * straight into source trees outside this Gradle project rather than through
- * KSP's `CodeGenerator` — see `TypeScriptProcessor` for why that channel is the
+ * KSP's `CodeGenerator`; see `TypeScriptProcessor` for why that channel is the
  * wrong one for them.
  *
- * The comparison is not a micro-optimisation. Both files sit under a watcher —
- * Vite's dev server on one, `cargo`'s mtime check on the other — and rewriting
+ * The comparison is not a micro-optimisation. Both files sit under a watcher
+ * (Vite's dev server on one, `cargo`'s mtime check on the other), and rewriting
  * identical bytes on every Gradle build is what makes a Kotlin-only change
  * reload the browser or relink the Rust host for nothing.
  */

@@ -45,7 +45,7 @@ class ExportedParameter(parameter: KSValueParameter) {
      * has been looked at, and `null` is the only starting value every type has.
      *
      * The null it starts at carries no meaning of its own, which is the point.
-     * Presence is tracked separately, by the mask — `deserialize` clears this
+     * Presence is tracked separately, by the mask: `deserialize` clears this
      * parameter's bit when the decoder actually visits its key. That is what lets
      * a parameter be *both* nullable and defaulted: an omitted argument leaves
      * the bit set and the declared default applies, while an explicit null clears
@@ -75,8 +75,8 @@ class ExportedParameter(parameter: KSValueParameter) {
  *
  * A non-null parameter rejects an explicit null here, at the point of decoding,
  * rather than at either call site. The two call sites disagree about what a null
- * field means — the direct call treats it as a value, the synthetic one as an
- * omitted argument — and only the decoder is in a position to know it was a key
+ * field means (the direct call treats it as a value, the synthetic one as an
+ * omitted argument), and only the decoder is in a position to know it was a key
  * the host actually sent. Guarding here also makes the field's null unambiguous
  * for everything downstream: for a non-null parameter it can only mean absent.
  */
@@ -98,8 +98,8 @@ fun ExportedParameter.readElement(
 /**
  * Reads the parameter for a direct, named call to the real function.
  *
- * The elvis is unreachable — [readElement] has already rejected an explicit
- * null, and the mask has confirmed the key was present — but the field is
+ * The elvis is unreachable ([readElement] has already rejected an explicit
+ * null, and the mask has confirmed the key was present), but the field is
  * nullable and the compiler is owed something. `error` rather than `!!` so that
  * if the reasoning above ever stops holding, the failure says which parameter.
  */
@@ -127,7 +127,7 @@ fun ExportedParameter.syntheticAccess(decoder: String, field: String): CodeBlock
 /**
  * The element this parameter contributes to the argument descriptor.
  *
- * Named after the *parameter*, not after [field] — this is the key the host puts
+ * Named after the *parameter*, not after [field]: this is the key the host puts
  * on the wire, and the field is only what the decoder happens to call its slot.
  *
  * Every element is optional. Absence is not an error the format should raise

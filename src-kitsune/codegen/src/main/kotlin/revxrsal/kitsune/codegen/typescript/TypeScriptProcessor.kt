@@ -41,10 +41,10 @@ private const val DEFAULT_BRIDGE_IMPORT = "./Bridge"
  * A third processor rather than an extra output on the two that already read
  * these annotations, because the frontend wants *one* file and a `CodeGenerator`
  * output can only be written by the processor that owns it. Two processors
- * cannot cooperate on one file — they cannot see each other's symbols, and
- * nothing orders them — so the choice is one file per processor or one processor
- * for the file. The scan is cheap; the split file would be the frontend's
- * problem forever.
+ * cannot cooperate on one file, because they cannot see each other's symbols
+ * and nothing orders them, so the choice is one file per processor or one
+ * processor for the file. The scan is cheap; the split file would be the
+ * frontend's problem forever.
  *
  * ## Diagnostics
  *
@@ -56,7 +56,7 @@ private const val DEFAULT_BRIDGE_IMPORT = "./Bridge"
  * ## Ordinals
  *
  * The bindings dispatch by ordinal, so this processor has to hand out the same
- * numbers `FunctionProcessor` and `EventProcessor` do — and it cannot ask them,
+ * numbers `FunctionProcessor` and `EventProcessor` do, and it cannot ask them,
  * for the same reason it cannot share their output. `assignOrdinals` is the
  * shared rule that makes three independent walks agree; see its documentation
  * for why it is a sort rather than discovery order.
@@ -64,15 +64,15 @@ private const val DEFAULT_BRIDGE_IMPORT = "./Bridge"
  * ## Where the file goes
  *
  * Written straight to the configured path with ordinary file I/O, not through
- * KSP's `CodeGenerator`. The output is not an input to any Kotlin compilation —
- * it is source for a Vite build that lives outside this Gradle project — and
+ * KSP's `CodeGenerator`. The output is not an input to any Kotlin compilation
+ * (it is source for a Vite build that lives outside this Gradle project), and
  * KSP's generator can only write inside `build/generated/ksp`, from where the
  * frontend has no way to import it.
  *
  * The cost is that KSP does not track the file: deleting it by hand does not
  * make `kspKotlin` out of date, and `./gradlew clean` is what brings it back.
  * The aggregating outputs of the other two processors are what keep the *content*
- * correct — they force every source file to be reprocessed whenever any of them
+ * correct: they force every source file to be reprocessed whenever any of them
  * changes, so this processor never sees a partial set of exports.
  */
 class TypeScriptProcessor(

@@ -9,7 +9,7 @@ import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.buildCodeBlock
 
 /** `kotlinx.serialization.KSerializer`, the type each cached serializer is held as. */
-private val KSerializerClass = com.squareup.kotlinpoet.ClassName("kotlinx.serialization", "KSerializer")
+val KSerializerClass = com.squareup.kotlinpoet.ClassName("kotlinx.serialization", "KSerializer")
 
 /** Package qualifiers, dropped when a type is turned into an identifier. */
 private val QUALIFIER = Regex("""[A-Za-z0-9_]+\.""")
@@ -25,7 +25,7 @@ private val NOT_IDENTIFIER = Regex("""[^A-Za-z0-9_]""")
  * resolves it at compile time, but what it resolves *to* is a constructor call
  * for any type that is not a plain builtin: `serializer<String?>()` becomes
  * `String.serializer().nullable`, which allocates a `NullableSerializer`. Left
- * inline in the decode loop that is one allocation per argument per call — 200
+ * inline in the decode loop that is one allocation per argument per call, 200
  * bytes each, and the single largest cost in a wrapper that decodes two
  * arguments. `List<String>` and friends are worse.
  *
@@ -40,9 +40,9 @@ class SerializerCache(private val nameAllocator: NameAllocator = NameAllocator()
     /**
      * The property holding `serializer<[type]>()`, declaring it on first use.
      *
-     * Insertion-ordered, so a given set of exports always produces the same file
-     * — KSP's incremental machinery compares outputs, and a reshuffled file would
-     * invalidate every consumer on every build.
+     * Insertion-ordered, so a given set of exports always produces the same
+     * file. KSP's incremental machinery compares outputs, and a reshuffled file
+     * would invalidate every consumer on every build.
      */
     fun nameFor(type: TypeName): String = cached.getOrPut(type) {
         val identifier = type.toString()

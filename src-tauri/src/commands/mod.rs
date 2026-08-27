@@ -7,7 +7,7 @@ pub mod bridge;
 /// result.
 ///
 /// The body is borrowed for the whole call rather than cloned. It is owned by
-/// this future — `req` was moved in — so it outlives the `await` without the
+/// this future (`req` was moved in), so it outlives the `await` without the
 /// payload being copied to prove it.
 #[tauri::command]
 pub async fn call_kt(req: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {

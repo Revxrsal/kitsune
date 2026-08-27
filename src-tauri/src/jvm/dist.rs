@@ -34,13 +34,13 @@ impl JavaDist {
             ("application jar", image.jar()),
             // Required, not an optimization: vmoptions.txt sets -XX:AOTMode=on,
             // so a missing cache aborts VM startup. Checked here only to beat
-            // the JVM to the error message — "Error occurred during
+            // the JVM to the error message, since "Error occurred during
             // initialization of VM" says nothing useful.
             ("AOT cache", image.aot_cache()),
         ] {
             if !path.exists() {
                 bail!(
-                    "no {what} at {} — run ./gradlew dist in src-kitsune/",
+                    "no {what} at {}; run ./gradlew dist in src-kitsune/",
                     path.display()
                 );
             }
@@ -115,5 +115,5 @@ fn default_root() -> Result<PathBuf> {
     if dev.join("runtime").is_dir() {
         return Ok(dev);
     }
-    bail!("no runtime found — run ./gradlew dist in src-kitsune/ first")
+    bail!("no runtime found; run ./gradlew dist in src-kitsune/ first")
 }

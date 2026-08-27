@@ -13,7 +13,7 @@ repositories {
 }
 
 dependencies {
-    // KSP 2.x is versioned independently of Kotlin — 2.3.11 is a KSP version,
+    // KSP 2.x is versioned independently of Kotlin: 2.3.11 is a KSP version,
     // not a Kotlin one. KSP2 runs the annotation processing pass on its own
     // embedded Analysis API rather than on the compiler the project builds
     // with, which is what lets this pair with Kotlin 2.4.10.

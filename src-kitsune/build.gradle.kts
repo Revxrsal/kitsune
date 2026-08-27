@@ -4,7 +4,7 @@ plugins {
     kotlin("plugin.serialization") version "2.4.10"
 
     // Runs :codegen over this module's sources. KSP 2.x is versioned
-    // independently of Kotlin — 2.3.11 is a KSP version, not a Kotlin one — and
+    // independently of Kotlin (2.3.11 is a KSP version, not a Kotlin one) and
     // must match the symbol-processing-api :codegen compiles against.
     id("com.google.devtools.ksp") version "2.3.11"
 
@@ -22,11 +22,11 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.11.0")
 
     // `suspend` itself is stdlib, but the scope suspending exports are launched
-    // in — and the dispatchers behind it — are not. See ipc/Scope.kt.
+    // in is not, and neither are the dispatchers behind it. See ipc/Scope.kt.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // `ksp`, not `implementation`: the processor runs at compile time and must
-    // stay off the runtime classpath — it drags in kotlinpoet and the KSP API,
+    // stay off the runtime classpath; it drags in kotlinpoet and the KSP API,
     // neither of which the shipped jar has any use for.
     ksp(project(":codegen"))
 }
@@ -43,7 +43,7 @@ tasks.shadowJar {
 
 kitsune {
     // Generated TypeScript for every export, written into the frontend's source
-    // tree next to Bridge.ts — which is what makes the default ./Bridge import
+    // tree next to Bridge.ts, which is what makes the default ./Bridge import
     // resolve, and why bridgeImport is left alone here.
     bindings.set(layout.projectDirectory.file("../src/bindings.ts"))
 
@@ -58,7 +58,7 @@ kitsune {
     // Flags shared by the AOT training runs and the Rust host. Changing this
     // list rebuilds the cache; the host picks it up from dist/lib/vmoptions.txt
     // with no recompile. Every entry here is validated against the cache at
-    // startup, and several of them reject it outright on mismatch — see the
+    // startup, and several of them reject it outright on mismatch. See the
     // docs on AotCacheTask.
     vmOptions.set(
         listOf(

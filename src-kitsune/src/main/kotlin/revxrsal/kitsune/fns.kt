@@ -12,10 +12,7 @@ data class SomeEvent(val id: Int, val name: String = "hi")
 
 @ExportFunction
 fun emitEvent() {
-    application.eventsHandler.dispatch(
-        event = SomeEvent(1),
-        serializer = SomeEvent.serializer(),
-    )
+    application.eventsHandler.dispatch(SomeEvent(1))
 }
 
 @Listener

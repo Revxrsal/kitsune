@@ -12,7 +12,7 @@ use jni::{Env, jni_str, refs::LoaderContext};
 /// Hands control to the Kotlin side.
 ///
 /// This is what runs `KitsuneApplication`'s initializer, and that initializer is
-/// what installs the singleton every later bridge call is dispatched through —
+/// what installs the singleton every later bridge call is dispatched through,
 /// so this has to run, once, on an attached thread, before the first call can
 /// arrive.
 ///

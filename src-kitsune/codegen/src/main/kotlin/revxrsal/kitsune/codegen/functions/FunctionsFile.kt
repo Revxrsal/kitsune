@@ -39,12 +39,12 @@ class ExportedEntry(val exportedName: String, val function: ExportedFun)
  *
  * One file rather than one per function, and one write rather than one per
  * round. A `CodeGenerator` refuses to create the same output path twice, so the
- * aggregate can only be emitted once the full set is known — which is also why
+ * aggregate can only be emitted once the full set is known, which is also why
  * the processor collects everything before calling this.
  *
  * `aggregating = true` tells KSP's incremental machinery that this output
  * depends on the whole set of annotated sources, so adding an export elsewhere
- * invalidates it. Marking it isolating instead would leave the tables stale —
+ * invalidates it. Marking it isolating instead would leave the tables stale,
  * and, now that dispatch is positional, stale means *misrouted* rather than
  * merely incomplete.
  */
@@ -83,13 +83,13 @@ fun writeFunctionsFile(
  * The registry the host dispatches through.
  *
  * Two flat arrays indexed by ordinal rather than a map keyed by name. The
- * payload arrives carrying the ordinal, so dispatch is a bounds check and a load
- * — no string to decode out of the frame, no hash, no `equals`. [names] is
- * carried alongside purely so a bad ordinal can be reported in terms a person
- * recognises.
+ * payload arrives carrying the ordinal, so dispatch is a bounds check and a
+ * load, with no string to decode out of the frame, no hash and no `equals`.
+ * [names] is carried alongside purely so a bad ordinal can be reported in terms
+ * a person recognises.
  *
  * The wrapper each entry points at is named after the *declaration*, while the
- * name at the same index is the exported one — `@ExportFunction(name = ...)` can
+ * name at the same index is the exported one: `@ExportFunction(name = ...)` can
  * differ from the function's own name, and only the exported one is on the wire.
  */
 private fun generatedFunctionsObject(exported: List<ExportedEntry>): TypeSpec {
@@ -130,13 +130,13 @@ private fun generatedFunctionsObject(exported: List<ExportedEntry>): TypeSpec {
     return TypeSpec.objectBuilder("GeneratedFunctions")
         .addKdoc(
             "Every function annotated `@ExportFunction`, indexed by the ordinal the host\n" +
-                "dispatches with. Generated — do not edit.\n"
+                "dispatches with. Generated. Do not edit.\n"
         )
         .addProperty(
             PropertySpec.builder("names", namesType)
                 .addKdoc(
                     "The exported name at each ordinal. Sorted, because that is how the\n" +
-                        "ordinals were handed out — so a name maps back through `binarySearch`.\n"
+                        "ordinals were handed out, so a name maps back through `binarySearch`.\n"
                 )
                 .addAnnotation(JvmFieldClass)
                 .initializer(names)

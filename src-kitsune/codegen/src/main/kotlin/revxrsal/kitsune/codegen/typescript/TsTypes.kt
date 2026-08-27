@@ -25,8 +25,8 @@ private val IDENTIFIER = Regex("""[A-Za-z_$][A-Za-z0-9_$]*""")
  * Kotlin types that map onto a TypeScript builtin, keyed by qualified name.
  *
  * Every integer width collapses to `number`, `Long` included. That is not a
- * simplification the mapper is free to make elsewhere — JavaScript numbers carry
- * 53 bits of integer precision, so a `Long` past 2^53 arrives rounded — but it
+ * simplification the mapper is free to make elsewhere (JavaScript numbers carry
+ * 53 bits of integer precision, so a `Long` past 2^53 arrives rounded), but it
  * is what `cbor-x` hands the caller, and describing it as anything else would
  * make the binding disagree with the value at runtime.
  *
@@ -54,7 +54,7 @@ private val BUILTINS = mapOf(
     // from acting on it without narrowing first.
     "kotlin.Any" to UNKNOWN,
     // KitsuneCbor sets alwaysUseByteString, so a ByteArray is a CBOR byte string
-    // rather than an array of numbers — which is what cbor-x decodes to a
+    // rather than an array of numbers, which is what cbor-x decodes to a
     // Uint8Array. The other primitive arrays are ordinary CBOR arrays.
     "kotlin.ByteArray" to "Uint8Array",
     "kotlin.ShortArray" to "number[]",
@@ -95,15 +95,15 @@ private val MAPS = setOf(
  * Maps Kotlin types onto TypeScript ones, collecting the declarations the
  * results refer to.
  *
- * What is mapped is the *wire* shape — what `KitsuneCbor` encodes and `cbor-x`
- * hands back — not the Kotlin declaration. The two differ in enough places
+ * What is mapped is the *wire* shape (what `KitsuneCbor` encodes and `cbor-x`
+ * hands back), not the Kotlin declaration. The two differ in enough places
  * (`Long`, `Char`, `ByteArray`, value classes) that treating this as a syntactic
  * translation would produce bindings that typecheck and then lie.
  *
  * ## Why not kotlinx-serialization-typescript-generator
  *
  * `adamko-dev/kotlinx-serialization-typescript-generator` solves this exact
- * problem and solves it well, but it walks `SerialDescriptor`s — it is handed a
+ * problem and solves it well, but it walks `SerialDescriptor`s: it is handed a
  * `KSerializer` and reflects over the descriptor tree at runtime. A KSP
  * processor has no serializers to hand it: the classes it is describing are the
  * ones currently being compiled, and their plugin-generated serializers do not
@@ -136,7 +136,7 @@ class TsTypes(private val logger: KSPLogger) {
      * The TypeScript type for [type], declaring anything it refers to.
      *
      * [node] is only used to place diagnostics, and is the declaration the type
-     * was read off — a parameter, a property, a return type.
+     * was read off, whether a parameter, a property or a return type.
      */
     fun typeOf(type: KSType, node: KSNode?): String {
         val rendered = render(type, node)
@@ -179,8 +179,8 @@ class TsTypes(private val logger: KSPLogger) {
     /**
      * The [index]th type argument of [type].
      *
-     * A star projection has no type to resolve — `List<*>` says nothing about
-     * its elements — and is the one case where the argument is legitimately
+     * A star projection has no type to resolve (`List<*>` says nothing about
+     * its elements) and is the one case where the argument is legitimately
      * missing rather than malformed.
      */
     private fun argument(type: KSType, index: Int, node: KSNode?): String {
@@ -212,8 +212,8 @@ class TsTypes(private val logger: KSPLogger) {
         qualifiedName: String,
         node: KSNode?,
     ): String {
-        // Enums are serializable without the annotation — kotlinx has a builtin
-        // serializer for them — so they are answered before it is asked for.
+        // Enums are serializable without the annotation (kotlinx has a builtin
+        // serializer for them), so they are answered before it is asked for.
         if (declaration.classKind == ClassKind.ENUM_CLASS) {
             return declare(declaration, qualifiedName) { name -> enum(declaration, name) }
         }
@@ -267,8 +267,8 @@ class TsTypes(private val logger: KSPLogger) {
      * Reserves a name for [declaration] and fills in its body, once.
      *
      * The reservation happens before [body] runs, which is what stops a type
-     * that contains itself — a tree node, a linked list — from recursing until
-     * the stack runs out.
+     * that contains itself, like a tree node or a linked list, from recursing
+     * until the stack runs out.
      */
     private fun declare(
         declaration: KSClassDeclaration,
@@ -287,7 +287,7 @@ class TsTypes(private val logger: KSPLogger) {
     /**
      * The TypeScript name for a Kotlin class.
      *
-     * Nested classes are flattened — `Outer.Inner` becomes `Outer_Inner` — since
+     * Nested classes are flattened (`Outer.Inner` becomes `Outer_Inner`) since
      * TypeScript has no way to nest an interface inside another. Two classes
      * that still collide after that fall back to the whole qualified name, which
      * is ugly but unambiguous, and warned about so it can be fixed with
@@ -320,7 +320,7 @@ class TsTypes(private val logger: KSPLogger) {
      * rule the generated Kotlin argument descriptors follow, one level down.
      *
      * For an event this means one interface serves both directions, and the `?`
-     * is read differently by each — the emitter may omit the key, the listener
+     * is read differently by each: the emitter may omit the key, the listener
      * may receive it absent only if the Kotlin side omitted it too. There is no
      * second shape to split them into as long as both sides send the same class.
      */

@@ -25,7 +25,7 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri` and the Kotlin build —
+      // 3. tell Vite to ignore watching `src-tauri` and the Kotlin build;
       //    src-kitsune/dist alone is a 41 MB jlink image.
       ignored: ["**/src-tauri/**", "**/src-kitsune/**"],
     },

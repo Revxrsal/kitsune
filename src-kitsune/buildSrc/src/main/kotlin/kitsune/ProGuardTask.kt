@@ -21,13 +21,13 @@ import javax.inject.Inject
 
 /**
  * Runs the shadow jar through ProGuard, producing the jar the app actually
- * ships — renamed so the compiled Kotlin is harder to read, but with the names
+ * ships: renamed so the compiled Kotlin is harder to read, but with the names
  * the Rust host and the JVM launcher resolve *by string* left verbatim (see
  * `proguard-rules.pro` for that closed set).
  *
  * ## Why this owns `dist/lib/app.jar`
  *
- * The whole downstream pipeline — jdeps, the AOT cache, the host at runtime —
+ * The whole downstream pipeline (jdeps, the AOT cache, the host at runtime)
  * keys on one jar at one path. Rather than teach each of those to branch on
  * whether obfuscation ran, this task is the sole producer of that path in both
  * modes: with [enabled] off it copies the shadow jar through unchanged, with it
@@ -36,14 +36,14 @@ import javax.inject.Inject
  *
  * ## Library jars
  *
- * ProGuard has to resolve every reference the jar makes into the JDK — for
- * renaming, so an override of a JDK method is not treated as a private name and
- * broken. Where the toolchain ships a `jmods/` directory (JDK 9-23), its whole
- * contents are handed over as `-libraryjars`: an over-approximation, but
+ * ProGuard has to resolve every reference the jar makes into the JDK. That is
+ * for renaming, so an override of a JDK method is not treated as a private name
+ * and broken. Where the toolchain ships a `jmods/` directory (JDK 9-23), its
+ * whole contents are handed over as `-libraryjars`: an over-approximation, but
  * resolution only needs the classes present.
  *
  * JDK 24+ can omit `jmods` entirely (JEP 493, linking run-time images without
- * JMODs), shipping only the packed `lib/modules` image — which proguard-core
+ * JMODs), shipping only the packed `lib/modules` image, which proguard-core
  * cannot read as a library (it resolves nothing and every `java.lang` reference
  * dangles). So there, `bin/jimage extract` unpacks `lib/modules` into real
  * class files once, and each module directory is passed as a `-libraryjars`
@@ -69,14 +69,14 @@ abstract class ProGuardTask : DefaultTask() {
     @get:Input
     abstract val obfuscating: Property<Boolean>
 
-    /** ProGuard itself — `com.guardsquare:proguard-base` and its transitives. */
+    /** ProGuard itself: `com.guardsquare:proguard-base` and its transitives. */
     @get:Classpath
     abstract val proguardClasspath: ConfigurableFileCollection
 
     /**
      * The toolchain supplying the `jmods` used as `-libraryjars` and the `java`
      * that runs ProGuard. `@Nested` so the JDK's vendor and version join the
-     * up-to-date check — see [tool] — since a rename map is only reproducible
+     * up-to-date check (see [tool]), since a rename map is only reproducible
      * against the exact library classes it resolved against.
      */
     @get:Nested
@@ -175,7 +175,7 @@ abstract class ProGuardTask : DefaultTask() {
         }
 
         // jimage extract lays each module out under its own subdirectory, so each
-        // is its own classpath root — otherwise the module name would prefix every
+        // is its own classpath root; otherwise the module name would prefix every
         // package and nothing would resolve.
         return dest.listFiles { f -> f.isDirectory }?.sorted()?.map { it.absolutePath }.orEmpty()
     }

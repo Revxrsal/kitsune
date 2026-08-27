@@ -15,7 +15,7 @@ import kotlin.coroutines.CoroutineContext
  * embedded in a host process:
  *
  * 1. `GlobalScope` has no lifecycle. Nothing can cancel work started in it, so
- *    the host has no way to tell the Kotlin side to stop — see [shutdown].
+ *    the host has no way to tell the Kotlin side to stop; see [shutdown].
  * 2. Its children are not supervised. Two exports launched from unrelated host
  *    calls would be siblings under one job, and a failure in either cancels the
  *    other. [SupervisorJob] makes each direct child fail alone.
@@ -25,8 +25,8 @@ import kotlin.coroutines.CoroutineContext
  * 4. It is `@DelicateCoroutinesApi` precisely because of the above.
  *
  * [Dispatchers.Default] is the base because it is sized for CPU work and is the
- * neutral choice for code we do not control. An export that blocks — JDBC, a
- * synchronous HTTP client — is responsible for its own `withContext(Dispatchers.IO)`,
+ * neutral choice for code we do not control. An export that blocks (JDBC, a
+ * synchronous HTTP client) is responsible for its own `withContext(Dispatchers.IO)`,
  * exactly as it would be anywhere else.
  */
 object KitsuneScope : CoroutineScope {
@@ -44,8 +44,8 @@ object KitsuneScope : CoroutineScope {
     /**
      * Cancels every in-flight export and listener.
      *
-     * The scope is unusable afterwards — a cancelled [SupervisorJob] rejects new
-     * children — so this belongs at host teardown and nowhere else.
+     * The scope is unusable afterwards (a cancelled [SupervisorJob] rejects new
+     * children), so this belongs at host teardown and nowhere else.
      */
     fun shutdown() {
         cancel()

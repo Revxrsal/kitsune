@@ -34,8 +34,8 @@ const val ENTRYPOINT_OPTION = "kitsune.entrypoint"
  * Finds the `@KitsuneEntrypoint` declaration and writes the Rust host's
  * `entrypoint.rs`.
  *
- * The host has to name that class as a string — `FindClass` takes a binary name
- * and there is no Rust type to hang it off — so before this processor existed
+ * The host has to name that class as a string (`FindClass` takes a binary name
+ * and there is no Rust type to hang it off), so before this processor existed
  * the name was hand-written on the Rust side and nothing checked it against the
  * Kotlin source. A moved or renamed class compiled cleanly on both sides and
  * failed at startup with `NoClassDefFoundError`. Generating the string from the
@@ -49,7 +49,7 @@ const val ENTRYPOINT_OPTION = "kitsune.entrypoint"
  * compilation, and KSP's `CodeGenerator` can only write inside
  * `build/generated/ksp`, which is not a place `cargo` will look.
  *
- * The cost is the same too — KSP does not track the file, so deleting it by hand
+ * The cost is the same too: KSP does not track the file, so deleting it by hand
  * does not make `kspKotlin` out of date and `./gradlew clean` is what brings it
  * back. What keeps its *contents* honest is that the two aggregating processors
  * force every source file to be reprocessed whenever any of them changes, so a
@@ -61,7 +61,7 @@ const val ENTRYPOINT_OPTION = "kitsune.entrypoint"
  * staying quiet: it is the only processor that reads `@KitsuneEntrypoint`, so
  * nothing else has already said the annotation is on something the host cannot
  * hand control to. A rejected entrypoint fails the build and leaves the existing file
- * alone — overwriting it with a stub would turn one clear error into a second,
+ * alone; overwriting it with a stub would turn one clear error into a second,
  * unrelated Rust compile error on the next `cargo build`.
  */
 class EntrypointProcessor(
@@ -114,9 +114,9 @@ class EntrypointProcessor(
      *
      * "Not exactly one" is an error in both directions. Zero means the host has
      * nothing to hand control to and the app cannot start; more than one means the
-     * generated file would have to pick, and picking silently — by source order,
-     * which is not even stable — is how you ship a build that starts the wrong
-     * application.
+     * generated file would have to pick, and picking silently, by a source
+     * order that is not even stable, is how you ship a build that starts the
+     * wrong application.
      */
     private fun resolveEntrypoint(resolver: Resolver): KSClassDeclaration? {
         var annotated = 0
@@ -124,7 +124,7 @@ class EntrypointProcessor(
 
         for (symbol in resolver.symbolsAnnotatedWith(Annotations.ENTRYPOINT)) {
             annotated++
-            // @KitsuneEntrypoint is @Target(CLASS), so this is defensive — but a
+            // @KitsuneEntrypoint is @Target(CLASS), so this is defensive, but a
             // malformed symbol arrives as a plain KSAnnotated, and a cast would
             // fail the build with a ClassCastException and no source location.
             if (symbol !is KSClassDeclaration) {
@@ -142,9 +142,9 @@ class EntrypointProcessor(
             // @KitsuneEntrypoint declaration" on top of that would contradict
             // the source the reader is looking at.
             if (annotated == 0) {
-                // Also the shape a moved annotation package takes — see
-                // Annotations, which matches on names the compiler never checks
-                // — so the message names both possibilities.
+                // Also the shape a moved annotation package takes (see
+                // Annotations, which matches on names the compiler never
+                // checks), so the message names both possibilities.
                 logger.error(
                     "Kitsune codegen found no @KitsuneEntrypoint declaration. Annotate the " +
                         "class or object that extends ${Runtime.APPLICATION}; if one is " +
@@ -170,7 +170,7 @@ class EntrypointProcessor(
      * Whether the host can actually hand control to this declaration through JNI.
      *
      * Every rejection here is something that compiles on the Kotlin side and
-     * fails on the Rust side — at startup, with a message about a class
+     * fails on the Rust side at startup, with a message about a class
      * descriptor rather than about the annotation, or worse, without failing at
      * all. Checking at codegen time is what turns each into an error against the
      * declaration.
@@ -210,8 +210,8 @@ class EntrypointProcessor(
             logger.error("An entry point must be public.", this)
             return false
         }
-        // An object has no constructor to call — the host loads its class and
-        // lets the class initializer build it — so this only asks of a class.
+        // An object has no constructor to call (the host loads its class and
+        // lets the class initializer build it), so this only asks of a class.
         if (classKind == ClassKind.CLASS && !hasNoArgConstructor()) {
             logger.error(
                 "An entry point needs a public no-argument constructor; the host calls it with " +

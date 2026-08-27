@@ -14,7 +14,7 @@ object NativeFunctionBridge {
      * result.
      *
      * [ordinal] rather than a name: the host reads it straight out of the head of
-     * the frame, so no `String` is built on either side of the JNI boundary — a
+     * the frame, so no `String` is built on either side of the JNI boundary: a
      * `NewStringUTF` per call, plus the copy behind it, for a value that is only
      * ever used as a map key.
      *

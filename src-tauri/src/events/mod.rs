@@ -12,7 +12,7 @@ use tokio::sync::mpsc;
 /// dropping them.
 ///
 /// There has to be a ceiling. The producer is a Kotlin thread that must not
-/// block — see [`bridge::Events`] — so back-pressure is not available, and the
+/// block (see [`bridge::Events`]), so back-pressure is not available, and the
 /// only two options past this point are dropping the frame or growing without
 /// bound behind a webview that has stopped draining.
 const OUTBOUND_QUEUE: usize = 1024;
@@ -26,8 +26,8 @@ pub(crate) static EVENT_TX: OnceLock<mpsc::Sender<Vec<u8>>> = OnceLock::new();
 /// Registers the channel Kotlin-side events are pushed down.
 ///
 /// The draining task is spawned once and reads whichever channel is current, so
-/// a reload swaps the sink under it rather than tearing it down — which keeps the
-/// queue, and anything already in it, alive across the gap.
+/// a reload swaps the sink under it rather than tearing it down, which keeps
+/// the queue, and anything already in it, alive across the gap.
 #[tauri::command]
 pub fn register_events_pump(pump: Channel<InvokeResponseBody>) {
     *CHANNEL.write() = Some(pump);

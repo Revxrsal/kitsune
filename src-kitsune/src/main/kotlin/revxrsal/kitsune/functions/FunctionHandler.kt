@@ -8,7 +8,7 @@ import revxrsal.kitsune.coroutines.KitsuneScope
  *
  * The split is not cosmetic. A `suspend` export cannot be called from the host's
  * synchronous JNI thread without either blocking it or launching a coroutine,
- * and which of those is right is the caller's decision — so the distinction has
+ * and which of those is right is the caller's decision, so the distinction has
  * to survive into the registry rather than being erased by wrapping everything
  * in `runBlocking` at generation time.
  */
@@ -27,9 +27,9 @@ sealed interface ExportedFunction {
 
 /**
  * The exported functions of this module, indexed by the **ordinal** the host
- * dispatches with — the number the payload carries in its first two bytes.
+ * dispatches with, the number the payload carries in its first two bytes.
  *
- * Construct it from `GeneratedFunctions.handler()` rather than by hand — the
+ * Construct it from `GeneratedFunctions.handler()` rather than by hand: the
  * arrays it wraps are written by the KSP processor from the `@ExportFunction`
  * declarations, and a hand-built pair silently diverges. [exportedNames] is
  * parallel to [functions] and exists only so a bad ordinal can be reported in
@@ -105,7 +105,7 @@ class FunctionHandler(
      * [onComplete].
      *
      * [onComplete] runs on whichever thread the coroutine finished on, which is
-     * not the caller's — anything it touches has to be safe for that. A failure
+     * not the caller's, so anything it touches has to be safe for that. A failure
      * is delivered as a failed [Result] rather than thrown, so a host callback
      * sees both outcomes through one path.
      */
@@ -164,7 +164,7 @@ class FunctionHandler(
      *
      * The check is explicit rather than left to the array, because
      * `ArrayIndexOutOfBoundsException` crossing the bridge says nothing about
-     * what went wrong — and drift is exactly the case where the message has to
+     * what went wrong, and drift is exactly the case where the message has to
      * carry the diagnosis.
      */
     private fun resolve(ordinal: Int): ExportedFunction {

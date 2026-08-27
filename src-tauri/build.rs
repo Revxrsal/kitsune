@@ -1,5 +1,5 @@
-//! Builds the Kotlin half of the app and packs `src-kitsune/dist` — the jlink
-//! image, the shadow jar, the AOT cache and the shared VM options — into a
+//! Builds the Kotlin half of the app and packs `src-kitsune/dist` (the jlink
+//! image, the shadow jar, the AOT cache and the shared VM options) into a
 //! single zstd-compressed tarball that gets embedded in the binary with
 //! `include_bytes!`.
 //!
@@ -14,11 +14,11 @@
 //! straight off disk and `cargo build` stays fast while iterating on the Kotlin
 //! side.
 //!
-//! The tar is built deterministically — sorted entries, zeroed mtime/uid/gid,
-//! mode normalised to 0644/0755, symlinks followed — so an unchanged `dist/`
-//! hashes to the same
-//! value across rebuilds. That hash names the extraction directory, so a
-//! rebuild that changes nothing does not orphan the already-extracted image.
+//! The tar is built deterministically, with sorted entries, zeroed
+//! mtime/uid/gid, mode normalised to 0644/0755 and symlinks followed, so an
+//! unchanged `dist/` hashes to the same value across rebuilds. That hash names
+//! the extraction directory, so a rebuild that changes nothing does not orphan
+//! the already-extracted image.
 
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Write};
@@ -26,8 +26,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 /// The files that decide what `./gradlew shadowJar` produces. Everything else
-/// under `src-kitsune/` is either build output — `build/`, `.gradle/`,
-/// `.kotlin/` — or plays no part in the jar (`src/test/`), and tracking any of
+/// under `src-kitsune/` is either build output (`build/`, `.gradle/`,
+/// `.kotlin/`) or plays no part in the jar (`src/test/`), and tracking any of
 /// it would rerun this script, and the recompression below, on noise.
 ///
 /// Paths are relative to `src-kitsune/`. Directories are walked recursively by
@@ -40,7 +40,7 @@ const GRADLE_INPUTS: &[&str] = &[
     "gradle.properties",
     "gradle/libs.versions.toml",
     // A wrapper bump changes the Gradle version the whole build runs on, and
-    // the daemon JVM criteria decide which JDK it runs *on* — :codegen is
+    // the daemon JVM criteria decide which JDK it runs *on*; :codegen is
     // compiled to a class file version the daemon has to be able to load, so a
     // change here fails :kspKotlin before any other input gets a say.
     "gradle/wrapper/gradle-wrapper.properties",
@@ -49,7 +49,7 @@ const GRADLE_INPUTS: &[&str] = &[
     // nothing in it reaches dist/, and editing a test should not cost a relink.
     "src/main",
     // The KSP processor runs during :app's compilation, so its sources are
-    // compile inputs of :app exactly as :app's own sources are — and it is what
+    // compile inputs of :app exactly as :app's own sources are, and it is what
     // writes ../src/bindings.ts and src/jvm/entrypoint.rs.
     "codegen/build.gradle.kts",
     "codegen/src/main",
@@ -89,7 +89,7 @@ fn main() {
     println!("cargo::rustc-check-cfg=cfg(embedded_runtime)");
 
     // Before the debug early-return: an unembedded build still runs against
-    // dist/ off disk. This also lands before rustc reads the crate — KSP writes
+    // dist/ off disk. This also lands before rustc reads the crate. KSP writes
     // src/jvm/entrypoint.rs, and a build script finishes before compilation of
     // its own crate begins, so the file generated here is the one compiled.
     run_gradle(&kotlin, &out);
@@ -103,7 +103,7 @@ fn main() {
 
     assert!(
         dist.join("runtime").is_dir() && dist.join("lib").join("app.jar").is_file(),
-        "no bundled runtime at {} — KITSUNE_SKIP_GRADLE is set, so run ./gradlew shadowJar in src-kitsune/ yourself",
+        "no bundled runtime at {}; KITSUNE_SKIP_GRADLE is set, so run ./gradlew shadowJar in src-kitsune/ yourself",
         dist.display()
     );
 
@@ -139,7 +139,7 @@ fn should_embed() -> bool {
 /// The existence check is not defensiveness: Cargo treats a tracked path it
 /// cannot stat as changed, so naming `gradle.properties` in a tree that has no
 /// `gradle.properties` would rerun this script on every single build. The cost
-/// is that *creating* one of the optional files is not itself a trigger — it
+/// is that *creating* one of the optional files is not itself a trigger; it
 /// takes effect on the next rebuild that happens for any other reason.
 fn track_gradle_inputs(kotlin: &Path) {
     for rel in GRADLE_INPUTS {
@@ -154,7 +154,7 @@ fn track_gradle_inputs(kotlin: &Path) {
 ///
 /// `shadowJar` rather than `dist`: the jar is built straight into `dist/lib`
 /// and `shadowJar` is `finalizedBy(dist)`, so this one task also pulls the
-/// jlink image, the AOT cache and vmoptions.txt along — which is exactly the
+/// jlink image, the AOT cache and vmoptions.txt along, which is exactly the
 /// wiring that stops a jar from landing in dist/ without the cache being
 /// re-recorded against it.
 ///
@@ -165,21 +165,21 @@ fn track_gradle_inputs(kotlin: &Path) {
 /// ## Why a log file and not `Command::output()`
 ///
 /// Gradle's output has to go somewhere other than this script's stdout, which
-/// is Cargo's directive stream — but it must not go into a *pipe*.
+/// is Cargo's directive stream, but it must not go into a *pipe*.
 /// `output()` reads until EOF rather than until the child exits, and the
 /// wrapper forks a Gradle daemon that inherits the pipe and outlives it by
 /// design: the whole point of the daemon is to still be there for the next
 /// build. So the wrapper exits, this script would exit, and the read blocks on
-/// a write end nobody will ever close — for the daemon's idle timeout, three
-/// hours by default, and longer still every time another build resets it. From
-/// the outside `cargo build` simply hangs, silently, with no child process left
-/// to point at. It only bites the runs that *start* a daemon; a run that
-/// reuses a warm one never forks and never hangs, which is what makes it look
-/// intermittent.
+/// a write end nobody will ever close, for the length of the daemon's idle
+/// timeout: three hours by default, and longer still every time another build
+/// resets it. From the outside `cargo build` simply hangs, silently, with no
+/// child process left to point at. It only bites the runs that *start* a
+/// daemon; a run that reuses a warm one never forks and never hangs, which is
+/// what makes it look intermittent.
 ///
 /// Redirecting to a file sidesteps all of it: `status()` waits on the wrapper
 /// and nothing else, an inherited file handle blocks no one, and the log is
-/// still there to be read back into the panic below — and to be read by hand
+/// still there to be read back into the panic below, and to be read by hand
 /// afterwards, which a pipe never allowed.
 fn run_gradle(kotlin: &Path, out: &Path) {
     if std::env::var("KITSUNE_SKIP_GRADLE").as_deref() == Ok("1") {
@@ -190,14 +190,33 @@ fn run_gradle(kotlin: &Path, out: &Path) {
 
     // `--console=plain`: the output is redirected, not attached to a terminal,
     // and the rich console's control codes make the panic below unreadable.
-    let args = ["shadowJar", "--console=plain"];
+    let mut args = vec!["shadowJar", "--console=plain"];
+
+    // Nothing this build produces is going to be handed to anyone, so the
+    // ProGuard pass is pure latency: it renames classes nobody will read, and
+    // then the AOT cache has to be re-recorded against the renamed jar. Both
+    // land on every cold Gradle daemon, which is most of them.
+    //
+    // Off is not a different shape of build. `obfuscate` stays the sole
+    // producer of dist/lib/app.jar and copies the shadow jar through unchanged,
+    // so the task graph, the paths and the AOT wiring are identical either way
+    // and a debug `dist/` is as complete as a release one. That matters here
+    // because an unembedded build still *runs* against dist/ off disk.
+    //
+    // The two profiles do share one dist/, so alternating between them re-runs
+    // ProGuard and the cache each time. That contention is not new (both
+    // profiles always drove the same Gradle build), and Gradle notices, because
+    // ProGuardTask declares this an @Input.
+    if !should_embed() {
+        args.push("-Pkitsune.obfuscate=false");
+    }
 
     let mut cmd = if cfg!(windows) {
         // Rust will not exec a .bat directly, so Windows goes through cmd.
         //
         // `.\gradlew.bat`, not `gradlew.bat`: a bare name makes cmd *search*,
         // and the working directory is only in that search order while
-        // NoDefaultCurrentDirectoryInExePath is unset — some sandboxes and
+        // NoDefaultCurrentDirectoryInExePath is unset. Some sandboxes and
         // group policies set it, and then the wrapper is simply "not
         // recognized". An explicit relative path is resolved against the
         // working directory instead of searched for, so it is unaffected.
@@ -210,7 +229,7 @@ fn run_gradle(kotlin: &Path, out: &Path) {
         cmd
     } else {
         // Absolute, because `current_dir` is documented not to decide how a
-        // *relative program path* is resolved — that is platform specific and
+        // *relative program path* is resolved: that is platform specific and
         // explicitly unstable, and std's own advice is to pass an absolute
         // path. `kotlin` descends from CARGO_MANIFEST_DIR, so it already is
         // one. None of the cmd quoting caveats above apply here: this is an
@@ -250,20 +269,20 @@ fn run_gradle(kotlin: &Path, out: &Path) {
 ///
 /// Windows hands a child *every* handle marked inheritable, not only the three
 /// a parent redirects. Cargo runs a build script with its stdout and stderr on
-/// pipes that it reads itself — that is how the `cargo::` directives above get
-/// back to it — and those arrive inheritable, so `cmd`, the wrapper JVM and
+/// pipes that it reads itself (that is how the `cargo::` directives above get
+/// back to it), and those arrive inheritable, so `cmd`, the wrapper JVM and
 /// finally the Gradle daemon each end up holding a duplicate of the write ends.
 /// The daemon is precisely the one process that outlives the build on purpose,
 /// and Cargo reads those pipes until EOF rather than until this script exits.
 /// So `cargo build` sits there, silently, long after the build script is gone
-/// and with no child process left to point at, until the daemon happens to die
-/// — three hours, by default, reset by every build that reuses it.
+/// and with no child process left to point at, until the daemon happens to
+/// die: three hours later by default, reset by every build that reuses it.
 ///
 /// Redirecting Gradle's own output to a file (see `run_gradle`) fixes this
 /// script's wait but not Cargo's: these duplicates are inherited no matter what
 /// the child's own stdio are pointed at. Clearing HANDLE_FLAG_INHERIT closes it
 /// at the first hop, and disturbs neither the redirections std sets up for the
-/// child — it duplicates those itself, after this runs — nor this script's own
+/// child (it duplicates those itself, after this runs) nor this script's own
 /// writes to stdout.
 ///
 /// Unix needs none of it, hence the no-op: a descriptor survives exec only as
@@ -271,14 +290,14 @@ fn run_gradle(kotlin: &Path, out: &Path) {
 /// opens everything else CLOEXEC.
 ///
 /// What this deliberately does not reach: inheritance is transitive, so if
-/// *Cargo's own* stdout is a pipe — `cargo build | tee`, or a CI runner
-/// capturing the log — then a duplicate of that pipe was inherited into this
+/// *Cargo's own* stdout is a pipe (`cargo build | tee`, or a CI runner
+/// capturing the log), then a duplicate of that pipe was inherited into this
 /// process before any of our code ran, at a handle number we have no way to
 /// name, and it rides along to the daemon exactly as before. Cargo itself is
 /// unaffected and exits; whatever is reading Cargo is the one left waiting. An
 /// interactive terminal is a console handle rather than a pipe and does not
 /// care, which is why the ordinary case is covered. CI that pipes should be
-/// building the two halves separately anyway — that is what
+/// building the two halves separately anyway, which is what
 /// `KITSUNE_SKIP_GRADLE=1` is for.
 #[cfg(windows)]
 fn seal_cargo_pipes() {
@@ -325,7 +344,7 @@ fn append_tree<W: Write>(tar: &mut tar::Builder<W>, dir: &Path, prefix: &Path) {
 
         // `--dedup-legal-notices` collapses the per-module legal/ trees by
         // replacing the duplicates with relative symlinks, so dist/ does contain
-        // symlinks — six of them, all small licence texts. They are followed and
+        // symlinks, six of them, all small licence texts. They are followed and
         // stored as regular files: the archive stays regular-files-only, which
         // costs ~12 KB and keeps unpacking free of link-ordering and
         // escaping-target concerns.
@@ -350,7 +369,7 @@ fn append_tree<W: Write>(tar: &mut tar::Builder<W>, dir: &Path, prefix: &Path) {
     }
 }
 
-/// The only bit that has to survive the round trip is the executable one —
+/// The only bit that has to survive the round trip is the executable one.
 /// `runtime/lib/jspawnhelper` is exec'd by the JVM whenever the app spawns a
 /// process, and a non-executable copy fails deep inside ProcessBuilder.
 #[cfg(unix)]
