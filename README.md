@@ -248,6 +248,62 @@ re-recorded whenever the code it was trained on changes, and every build checks
 that it genuinely engages rather than quietly falling back to a cold start. A
 build that cannot produce a working cache fails instead of shipping a slow app.
 
+## Memory footprint
+
+A JVM inside a desktop app invites one question ahead of every other: what does
+it cost in RAM? For the sample app, idle with its window open, the answer is
+about **120 MB resident** — and the JVM is the smaller half of that.
+
+| | |
+| --- | --- |
+| Private working set, whole process tree | **126 MB** |
+| Drop in system available memory, closed → open | **118 MB** |
+| Time to a visible window (warm) | **542 ms** |
+| Time to steady-state memory | **2.8 s**, flat for the remaining 57 s |
+
+Where it goes, per process:
+
+```
+msedgewebview2   browser              29.7 MB
+msedgewebview2   gpu                  28.2 MB
+msedgewebview2   renderer             27.2 MB
+msedgewebview2   3 × utility          10.9 MB
+conhost                                1.1 MB
+                                     ────────
+WebView2 total                        ~96 MB    (76%)
+
+kitsune.exe      Rust host + JVM      29.4 MB   (24%)
+```
+
+There is no `java.exe`. The JVM is created in-process through the invocation
+API, so the whole Kotlin runtime — heap, metaspace, code cache, 18 threads —
+lives inside the same 29 MB as the Rust host. The webview costs three times what
+the language runtime does.
+
+`jcmd`, attached to a running app, shows why it stays there: after a forced GC
+the live heap is 1.1 MB, metaspace 2.2 MB used, code cache 1.6 MB used. Almost
+all of the 29 MB is fixed JVM overhead rather than anything the app allocated,
+which is the shape you want — it does not scale with how much Kotlin you write,
+only with how much of it is live at once.
+
+**Committed is not resident.** Task Manager's *Commit size* tells a scarier
+story: +864 MB for the tree, 544 MB of it `kitsune.exe`. That is `-Xmx512m` with
+no `-Xms`, so HotSpot's ergonomics pick an initial heap of 1/64 of physical RAM
+— 510 MB here — and commit all of it up front to hold a 1.1 MB live set. Those
+pages are never touched, so they cost address space and commit charge rather
+than memory. Adding `-Xms32m` to `vmOptions` drops roughly 480 MB of commit
+without moving the resident figure; it re-records the AOT cache, which the build
+does for you. The tree's *total* working set, 432 MB, is not a useful number at
+all: it counts every shared DLL page once per WebView2 process.
+
+> **About these numbers.** They come from one machine — Windows 11 Pro 26200,
+> i5-13400F, 32 GB RAM, WebView2 151.0.4129.107 — running the installed release
+> build of the sample app, warm, idle at its window, with the whole process tree
+> sampled every 500 ms for 60 s. A benchmark is a snapshot of one workload on
+> one configuration: your heap, your webview content, your OS and your GPU will
+> all move these figures. Treat them as an order of magnitude and measure your
+> own app.
+
 ## How it fits together
 
 ```
