@@ -7,8 +7,8 @@ lateinit var application: KitsuneApplication
 
 abstract class KitsuneApplication {
 
-    internal val functionsHandler = GeneratedFunctions.handler()
-    internal val eventsHandler = GeneratedEvents.handler()
+    val functionsHandler = GeneratedFunctions.handler()
+    val eventsHandler = GeneratedEvents.handler()
 
     init {
         require(!::application.isInitialized) {

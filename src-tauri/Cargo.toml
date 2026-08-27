@@ -56,3 +56,22 @@ blake3 = "1.8.7"
 tar = { version = "0.4.46", default-features = false }
 zstd = "0.13.3"
 tauri-build = { version = "2", features = [] }
+
+# Only the build script uses this, and only on Windows, where the Gradle wrapper
+# has to be launched with an explicit inherited-handle list so the daemon does
+# not end up holding Cargo's pipes. See build/spawn.rs.
+#
+# Gated so it is resolved only where it is needed. Note the cfg here is matched
+# against the *host*, not `--target`, because that is where a build script runs:
+# building for Linux from a Windows box still pulls this in, and someone on a
+# Linux or macOS host never sees it at all. That is the right way round — the
+# Unix half of spawn.rs is a plain std Command and needs nothing.
+#
+# The version is already in the lock file by way of tauri, so this adds no new
+# package to the tree.
+[target.'cfg(windows)'.build-dependencies]
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+] }
