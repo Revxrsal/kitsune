@@ -2,12 +2,14 @@ package kitsune
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
@@ -34,12 +36,20 @@ import javax.inject.Inject
  *
  * ## Library jars
  *
- * ProGuard has to resolve every reference the jar makes into the JDK, so the
- * toolchain's whole `jmods/` directory is passed as `-libraryjars`. That is an
- * over-approximation — jdeps computes the *minimal* module set elsewhere — but
- * resolution only needs the classes to be *present*, and handing ProGuard every
- * module means a new dependency on some corner of the JDK never turns into a
- * "can't find referenced class" the day it is added.
+ * ProGuard has to resolve every reference the jar makes into the JDK — for
+ * renaming, so an override of a JDK method is not treated as a private name and
+ * broken. Where the toolchain ships a `jmods/` directory (JDK 9-23), its whole
+ * contents are handed over as `-libraryjars`: an over-approximation, but
+ * resolution only needs the classes present.
+ *
+ * JDK 24+ can omit `jmods` entirely (JEP 493, linking run-time images without
+ * JMODs), shipping only the packed `lib/modules` image — which proguard-core
+ * cannot read as a library (it resolves nothing and every `java.lang` reference
+ * dangles). So there, `bin/jimage extract` unpacks `lib/modules` into real
+ * class files once, and each module directory is passed as a `-libraryjars`
+ * root. That extraction is ~20s and JDK-wide, so it is cached under the Gradle
+ * user home keyed by the exact JDK build ([jdkModulesCache]); a JDK with real
+ * jmods never pays it.
  */
 abstract class ProGuardTask : DefaultTask() {
 
@@ -79,6 +89,14 @@ abstract class ProGuardTask : DefaultTask() {
     @get:OutputFile
     abstract val outputJar: RegularFileProperty
 
+    /**
+     * Where the JEP-493 fallback unpacks the JDK's `lib/modules`. A cache, not a
+     * declared output: it lives outside the build tree (so `clean` does not force
+     * a re-extract) and is keyed by JDK build, so it is `@Internal`.
+     */
+    @get:Internal
+    abstract val jdkModulesCache: DirectoryProperty
+
     @get:Inject
     abstract val execOps: ExecOperations
 
@@ -98,22 +116,12 @@ abstract class ProGuardTask : DefaultTask() {
         // it a fresh target.
         output.delete()
 
-        val jmods = File(launcher.get().jmods)
-        val libraryJars = jmods.listFiles { f -> f.extension == "jmod" }?.sorted().orEmpty()
-        require(libraryJars.isNotEmpty()) {
-            "no .jmod files under $jmods to hand ProGuard as -libraryjars"
-        }
+        val libraryRoots = platformLibraryRoots()
 
         val args = buildList {
             add("-injars"); add(input.absolutePath)
             add("-outjars"); add(output.absolutePath)
-            libraryJars.forEach {
-                add("-libraryjars")
-                // The classes live under classes/ inside the jmod; the filter drops
-                // the nested jars and the module descriptor, which are not library
-                // classes and only produce noise.
-                add("${it.absolutePath}(!**.jar;!module-info.class)")
-            }
+            libraryRoots.forEach { add("-libraryjars"); add(it) }
             rulesFile.orNull?.asFile?.let { add("@${it.absolutePath}") }
         }
 
@@ -126,5 +134,49 @@ abstract class ProGuardTask : DefaultTask() {
 
         require(output.isFile && output.length() > 0) { "ProGuard produced no jar at $output" }
         logger.lifecycle("Obfuscated jar: ${output.absolutePath} (${output.length() / (1L shl 20)} MB)")
+    }
+
+    /**
+     * The `-libraryjars` roots ProGuard resolves the platform against. See the
+     * class KDoc: jmods directly when present, otherwise a one-time extraction of
+     * `lib/modules` cached per JDK build.
+     */
+    private fun platformLibraryRoots(): List<String> {
+        val jmods = File(launcher.get().jmods)
+        val jmodFiles = jmods.listFiles { f -> f.extension == "jmod" }?.sorted().orEmpty()
+        if (jmodFiles.isNotEmpty()) {
+            // The classes live under classes/ inside each jmod; the filter drops
+            // the nested jars and the module descriptor, which are not library
+            // classes and only produce noise.
+            return jmodFiles.map { "${it.absolutePath}(!**.jar;!module-info.class)" }
+        }
+
+        val javaHome = jmods.parentFile
+        val image = File(javaHome, "lib/modules")
+        check(image.isFile) {
+            "toolchain at $javaHome has neither jmods/ nor lib/modules; cannot resolve " +
+                "platform classes for ProGuard"
+        }
+
+        // One directory per JDK build, reused across builds and projects. The
+        // marker guards against a half-finished extraction being trusted.
+        val key = launcher.get().buildId.replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val dest = jdkModulesCache.get().asFile.resolve(key)
+        val marker = dest.resolve(".extracted")
+        if (!marker.exists()) {
+            dest.deleteRecursively()
+            dest.mkdirs()
+            logger.lifecycle("Extracting JDK modules for ProGuard (one-time, ~20s): ${dest.absolutePath}")
+            execOps.exec {
+                executable = launcher.get().tool("jimage")
+                args("extract", "--dir", dest.absolutePath, image.absolutePath)
+            }
+            marker.writeText(launcher.get().buildId)
+        }
+
+        // jimage extract lays each module out under its own subdirectory, so each
+        // is its own classpath root — otherwise the module name would prefix every
+        // package and nothing would resolve.
+        return dest.listFiles { f -> f.isDirectory }?.sorted()?.map { it.absolutePath }.orEmpty()
     }
 }

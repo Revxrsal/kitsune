@@ -89,6 +89,11 @@ val obfuscate = tasks.register<ProGuardTask>("obfuscate") {
     proguardClasspath.from(proguardTool)
     launcher.set(javaLauncher)
     outputJar.set(distDir.file("lib/app.jar"))
+    // Persistent across `clean`, so the JEP-493 module extraction is paid once
+    // per JDK rather than per clean build. Only used when the JDK lacks jmods.
+    jdkModulesCache.set(
+        layout.dir(provider { gradle.gradleUserHomeDir.resolve("caches/kitsune/jdk-modules") })
+    )
 }
 val appJar = obfuscate.flatMap { it.outputJar }
 
