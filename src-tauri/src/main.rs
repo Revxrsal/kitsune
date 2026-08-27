@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use jni::JavaVM;
 use kitsune_app_lib::{commands, events, jvm};
 use std::time::Duration;

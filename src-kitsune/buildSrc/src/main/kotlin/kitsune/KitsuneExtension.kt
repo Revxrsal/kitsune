@@ -83,4 +83,35 @@ abstract class KitsuneExtension {
 
     /** jlink `--exclude-files` patterns for tools the host never launches. */
     abstract val excludeFiles: ListProperty<String>
+
+    /**
+     * Whether to run the shipped jar through ProGuard.
+     *
+     * This is name obfuscation, not a security boundary: the goal is only to
+     * make the compiled Kotlin more tedious to read, and anyone determined can
+     * still recover the extracted jar. Defaults to on. The convention plugin
+     * routes the jar through ProGuard either way — see [ProGuardTask] — so
+     * flipping this off produces the same `dist/lib/app.jar` layout, just
+     * un-renamed.
+     */
+    abstract val obfuscate: Property<Boolean>
+
+    /**
+     * The ProGuard configuration file (keep rules).
+     *
+     * Defaults to `proguard-rules.pro` beside the build script. Its job is to
+     * exempt the closed set of names the Rust host and the JVM launcher resolve
+     * by string — the JNI bridge, the `@KitsuneEntrypoint` class, the AOT
+     * training main — from renaming; everything else is fair game.
+     */
+    abstract val obfuscationRules: RegularFileProperty
+
+    /**
+     * The `com.guardsquare:proguard-base` version to run.
+     *
+     * Pinned here rather than in the plugin so a bump for a newer class-file
+     * version — ProGuard has to be able to *read* the bytecode the toolchain
+     * emits — is a one-line change in the `kitsune { }` block.
+     */
+    abstract val proguardVersion: Property<String>
 }

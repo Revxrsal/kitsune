@@ -6,11 +6,14 @@ import org.gradle.api.file.FileSystemOperations
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+ import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.Nested
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import org.gradle.jvm.toolchain.JavaLauncher
 import org.gradle.process.ExecOperations
 import java.io.File
 import javax.inject.Inject
@@ -24,17 +27,31 @@ import javax.inject.Inject
  * (~12 MB), neither of which jlink can shrink much, so the real lever is
  * keeping the module list minimal — which [JdepsModulesTask] already does by
  * computing it instead of guessing.
+ *
+ * Linking is expensive and the module set rarely moves, so [modulesFile] is
+ * deliberately the only content-bearing input: Gradle fingerprints it by
+ * content, which leaves this task up-to-date across the ordinary code change
+ * that rebuilds the jar and re-runs jdeps to the same answer.
  */
 abstract class JlinkTask : DefaultTask() {
 
     @get:InputFile
     abstract val modulesFile: RegularFileProperty
 
-    @get:Input
-    abstract val jlinkExecutable: Property<String>
+    /**
+     * The toolchain supplying both `bin/jlink` and the `jmods` it links from.
+     *
+     * `@Nested` rather than a pair of path strings, so the JDK's vendor and
+     * version join the up-to-date check — see [tool]. A JDK upgraded in place
+     * would otherwise leave this task reporting up-to-date while the shipped
+     * image, and so the AOT cache trained against it, came from the old one.
+     */
+    @get:Nested
+    abstract val launcher: Property<JavaLauncher>
 
+    /** The resolved JDK build, which [launcher] alone does not pin. See [buildId]. */
     @get:Input
-    abstract val jmodsPath: Property<String>
+    val javaBuild: Provider<String> get() = launcher.map { it.buildId }
 
     /** `zip-0`..`zip-9`. zip-9 buys very little over zip-6 but costs nothing at runtime. */
     @get:Input
@@ -69,12 +86,13 @@ abstract class JlinkTask : DefaultTask() {
 
     @TaskAction
     fun run() {
+        val jdk = launcher.get()
         val target = outputDir.get().asFile
         // jlink refuses to write into an existing directory
         fsOps.delete { delete(target) }
 
         val options = buildList {
-            add("--module-path"); add(jmodsPath.get())
+            add("--module-path"); add(jdk.jmods)
             add("--add-modules"); add(modulesFile.get().asFile.readText().trim())
             add("--strip-debug")
             add("--no-man-pages")
@@ -90,7 +108,7 @@ abstract class JlinkTask : DefaultTask() {
         }
 
         execOps.exec {
-            executable = jlinkExecutable.get()
+            executable = jdk.tool("jlink")
             args(options)
         }
         logger.lifecycle("Runtime image: ${target.absolutePath} (${humanSize(target.diskUsage())})")
