@@ -65,6 +65,15 @@ rewritten around what the numbers said:
 5. **No reflection.** Every serializer, decoder and dispatch table is generated at compile time (like serde), never discovered at runtime.
 6. **A trimmed, pre-warmed JVM.** The runtime that ships is a `jlink` image containing only the modules your code uses, carrying an AOT cache recorded at build time and compressed with `zstd` — embedded straight into the Tauri binary.
 
+**Obfuscated on the way out.** The shipped jar is run through ProGuard before it
+is embedded, so the compiled Kotlin ships renamed rather than in the clear. The
+handful of names the Rust host and the JVM resolve by string — the
+`@KitsuneEntrypoint` class, the JNI bridge, the AOT training main — are held
+back from the rename; everything else is mangled, and `@kotlin.Metadata` is
+stripped so the original names cannot be read straight back out. This is name
+obfuscation, not a security boundary — a speed bump for reverse engineering, on
+by default and switchable off. See [Configuration](#configuration).
+
 ## What it looks like
 
 Here is the entire backend of a small app:
@@ -239,6 +248,62 @@ re-recorded whenever the code it was trained on changes, and every build checks
 that it genuinely engages rather than quietly falling back to a cold start. A
 build that cannot produce a working cache fails instead of shipping a slow app.
 
+## Memory footprint
+
+A JVM inside a desktop app invites one question ahead of every other: what does
+it cost in RAM? For the sample app, idle with its window open, the answer is
+about **120 MB resident** — and the JVM is the smaller half of that.
+
+| | |
+| --- | --- |
+| Private working set, whole process tree | **126 MB** |
+| Drop in system available memory, closed → open | **118 MB** |
+| Time to a visible window (warm) | **542 ms** |
+| Time to steady-state memory | **2.8 s**, flat for the remaining 57 s |
+
+Where it goes, per process:
+
+```
+msedgewebview2   browser              29.7 MB
+msedgewebview2   gpu                  28.2 MB
+msedgewebview2   renderer             27.2 MB
+msedgewebview2   3 × utility          10.9 MB
+conhost                                1.1 MB
+                                     ────────
+WebView2 total                        ~96 MB    (76%)
+
+kitsune.exe      Rust host + JVM      29.4 MB   (24%)
+```
+
+There is no `java.exe`. The JVM is created in-process through the invocation
+API, so the whole Kotlin runtime — heap, metaspace, code cache, 18 threads —
+lives inside the same 29 MB as the Rust host. The webview costs three times what
+the language runtime does.
+
+`jcmd`, attached to a running app, shows why it stays there: after a forced GC
+the live heap is 1.1 MB, metaspace 2.2 MB used, code cache 1.6 MB used. Almost
+all of the 29 MB is fixed JVM overhead rather than anything the app allocated,
+which is the shape you want — it does not scale with how much Kotlin you write,
+only with how much of it is live at once.
+
+**Committed is not resident.** Task Manager's *Commit size* tells a scarier
+story: +864 MB for the tree, 544 MB of it `kitsune.exe`. That is `-Xmx512m` with
+no `-Xms`, so HotSpot's ergonomics pick an initial heap of 1/64 of physical RAM
+— 510 MB here — and commit all of it up front to hold a 1.1 MB live set. Those
+pages are never touched, so they cost address space and commit charge rather
+than memory. Adding `-Xms32m` to `vmOptions` drops roughly 480 MB of commit
+without moving the resident figure; it re-records the AOT cache, which the build
+does for you. The tree's *total* working set, 432 MB, is not a useful number at
+all: it counts every shared DLL page once per WebView2 process.
+
+> **About these numbers.** They come from one machine — Windows 11 Pro 26200,
+> i5-13400F, 32 GB RAM, WebView2 151.0.4129.107 — running the installed release
+> build of the sample app, warm, idle at its window, with the whole process tree
+> sampled every 500 ms for 60 s. A benchmark is a snapshot of one workload on
+> one configuration: your heap, your webview content, your OS and your GPU will
+> all move these figures. Treat them as an order of magnitude and measure your
+> own app.
+
 ## How it fits together
 
 ```
@@ -324,7 +389,7 @@ kitsune {
     entrypoint.set(layout.projectDirectory.file("../src-tauri/src/jvm/entrypoint.rs"))
 
     // Class whose main() is run to record the AOT profile.
-    trainingMainClass.set("revxrsal.kitsune.Training")
+    trainingMainClass.set("revxrsal.kitsune.aot.Training")
 
     // Shared by the AOT training runs and the host process. Changing this
     // list re-records the cache instead of breaking it.
@@ -339,6 +404,31 @@ kitsune {
 
 `compression` (`zip-0` through `zip-9`) and `excludeFiles` are available too, for
 squeezing the jlink image further.
+
+Obfuscation is on by default and configured here as well:
+
+```kotlin
+kitsune {
+    // Run the shipped jar through ProGuard. On by default; set false to ship
+    // the jar un-renamed.
+    obfuscate.set(true)
+
+    // The keep rules. Defaults to proguard-rules.pro beside the build script,
+    // which exempts the names the Rust host and the JVM resolve by string.
+    obfuscationRules.set(layout.projectDirectory.file("proguard-rules.pro"))
+
+    // The com.guardsquare:proguard-base version. Bump it when the JDK's
+    // class-file version outpaces what ProGuard can read.
+    proguardVersion.set("7.10.0")
+}
+```
+
+The jar is run through ProGuard whether or not obfuscation is enabled — with it
+off the jar is copied through untouched — so the same `dist/lib/app.jar` layout
+is produced either way and the AOT cache always trains against the jar that
+actually ships. The default rules keep it to renaming only (`-dontshrink
+-dontoptimize`); shrinking and optimization are yours to enable once you have
+confirmed a clean build.
 
 ## A note on the AOT training run
 
@@ -362,7 +452,7 @@ handle: no arguments, all-required, defaulted, nullable-and-defaulted, `Unit`,
 `object` members, and each of those again as `suspend`. Treat them as the test
 suite they are, and delete them when you start your own app.
 
-Linux is what it has been developed against. The runtime path logic covers
-macOS and Windows, but neither has been exercised.
+It has been developed against Linux, macOS and Windows, and the runtime path
+logic is verified working on all three.
 </parameter>
 </invoke>

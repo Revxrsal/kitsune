@@ -2,6 +2,7 @@ import kitsune.AotCacheTask
 import kitsune.JdepsModulesTask
 import kitsune.JlinkTask
 import kitsune.KitsuneExtension
+import kitsune.ProGuardTask
 import kitsune.VerifyAotCacheTask
 import kitsune.WriteVmOptionsTask
 import org.gradle.jvm.tasks.Jar
@@ -30,13 +31,23 @@ val kitsune = extensions.create<KitsuneExtension>("kitsune").apply {
             "/java.base/lib/jexec",
         )
     )
+    obfuscate.convention(true)
+    proguardVersion.convention("7.10.0")
 }
+
+// Set outside the apply block so `layout` resolves against the project rather
+// than the extension receiver.
+kitsune.obfuscationRules.convention(layout.projectDirectory.file("proguard-rules.pro"))
 
 // jdeps/jlink are taken from the project's Java toolchain, not from PATH, so
 // the tools always match the version the code is compiled against.
-val toolchainHome = extensions.getByType<JavaToolchainService>()
+//
+// Handed to the tasks as the launcher itself rather than as a path, because the
+// tasks declare it @Nested: what they key on is then the JDK's vendor and
+// version, not where it happens to be installed. A JDK upgraded in place at a
+// stable path is the case that matters — see kitsune.tool.
+val javaLauncher = extensions.getByType<JavaToolchainService>()
     .launcherFor(java.toolchain)
-    .map { it.metadata.installationPath.asFile.absolutePath }
 
 // Only pays off on JDKs that ship unstripped binaries; Temurin does not, so this
 // is usually a no-op. Skipped entirely when objcopy is not installed.
@@ -50,13 +61,49 @@ val objcopy = providers.provider {
 val distDir = layout.projectDirectory.dir("dist")
 val shadowJar = tasks.named<Jar>("shadowJar")
 
+// ProGuard, resolved from the project's repositories at execution time. The
+// version comes from the extension, deferred so a `kitsune { }` override still
+// wins even though this line runs before that block.
+val proguardTool = configurations.create("proguardTool") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies.addProvider(
+    proguardTool.name,
+    kitsune.proguardVersion.map { "com.guardsquare:proguard-base:$it" }
+)
+
+// The obfuscated (or, when disabled, copied) jar the app ships — the sole
+// producer of dist/lib/app.jar. Everything that used to read the shadow jar as
+// "the app jar" reads this instead, so the shipped bytes are always the ones
+// that went through here. jdeps stays on the shadow jar deliberately: it only
+// needs the JDK-module set, which renaming does not move, and keeping it off
+// this task lets jlink run without waiting for ProGuard.
+val obfuscate = tasks.register<ProGuardTask>("obfuscate") {
+    group = "distribution"
+    description = "Runs the shadow jar through ProGuard into dist/lib/app.jar."
+
+    inputJar.set(shadowJar.flatMap { it.archiveFile })
+    rulesFile.set(kitsune.obfuscationRules)
+    obfuscating.set(kitsune.obfuscate)
+    proguardClasspath.from(proguardTool)
+    launcher.set(javaLauncher)
+    outputJar.set(distDir.file("lib/app.jar"))
+    // Persistent across `clean`, so the JEP-493 module extraction is paid once
+    // per JDK rather than per clean build. Only used when the JDK lacks jmods.
+    jdkModulesCache.set(
+        layout.dir(provider { gradle.gradleUserHomeDir.resolve("caches/kitsune/jdk-modules") })
+    )
+}
+val appJar = obfuscate.flatMap { it.outputJar }
+
 val jdepsModules = tasks.register<JdepsModulesTask>("jdepsModules") {
     group = "distribution"
     description = "Prints the JDK modules required by the shadow jar."
 
     jar.set(shadowJar.flatMap { it.archiveFile })
     multiRelease.set(java.toolchain.languageVersion.map { it.toString() })
-    jdepsExecutable.set(toolchainHome.map { "$it/bin/jdeps" })
+    launcher.set(javaLauncher)
     modulesFile.set(layout.buildDirectory.file("jdeps/modules.txt"))
 }
 
@@ -65,8 +112,7 @@ val jlinkRuntime = tasks.register<JlinkTask>("jlinkRuntime") {
     description = "Builds a trimmed JRE into dist/runtime using jlink."
 
     modulesFile.set(jdepsModules.flatMap { it.modulesFile })
-    jlinkExecutable.set(toolchainHome.map { "$it/bin/jlink" })
-    jmodsPath.set(toolchainHome.map { "$it/jmods" })
+    launcher.set(javaLauncher)
     compression.set(kitsune.compression)
     vmVariant.set("server")
     objcopyExecutable.set(objcopy)
@@ -89,7 +135,9 @@ val aotCache = tasks.register<AotCacheTask>("aotCache") {
     description = "Records an AOT cache (JEP 483/515) using the bundled runtime."
 
     runtimeDir.set(jlinkRuntime.flatMap { it.outputDir })
-    jar.set(shadowJar.flatMap { it.archiveFile })
+    // The obfuscated jar, not the shadow jar: the cache records classes from and
+    // is validated against the exact jar the host loads, which is this one.
+    jar.set(appJar)
     trainingMainClass.set(kitsune.trainingMainClass)
     vmOptions.set(kitsune.vmOptions)
     configurationFile.set(layout.buildDirectory.file("aot/app.aotconf"))
@@ -117,15 +165,13 @@ val dist = tasks.register("dist") {
 // The AOT cache records the classpath it was trained on, so it has to be built
 // against the jar at the path the host will actually load.
 //
-// That path is dist/lib, and the jar is *built* there rather than copied there.
-// An earlier version copied build/libs/app.jar into dist/lib as part of `dist`,
-// which left two locations for one artifact: a bare `gradlew shadowJar` — or any
-// IDE build — refreshed build/libs and left dist/lib behind, and the host reads
-// dist/lib, so it silently ran stale code. One output directory makes that drift
-// unrepresentable.
+// That path is dist/lib/app.jar, and the `obfuscate` task is its one producer —
+// the shadow jar is now an intermediate that lands in the default build/libs and
+// is never loaded by anyone. That keeps the drift the old layout guarded against
+// unrepresentable: there is a single dist/lib/app.jar, and a bare `gradlew
+// shadowJar` or an IDE build still ends at it, because the finalizer below pulls
+// the whole chain (obfuscate -> aotCache) through on every jar rebuild.
 shadowJar {
-    destinationDirectory.set(distDir.dir("lib"))
-
     // Rebuilding the jar without rebuilding the cache is not a lost speedup —
     // it silently runs the OLD code. The JVM does not protect you here: with
     // -Xlog:class+path=trace it records the app jar as classpath entry [1] and
