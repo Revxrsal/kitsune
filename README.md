@@ -65,6 +65,15 @@ rewritten around what the numbers said:
 5. **No reflection.** Every serializer, decoder and dispatch table is generated at compile time (like serde), never discovered at runtime.
 6. **A trimmed, pre-warmed JVM.** The runtime that ships is a `jlink` image containing only the modules your code uses, carrying an AOT cache recorded at build time and compressed with `zstd` — embedded straight into the Tauri binary.
 
+**Obfuscated on the way out.** The shipped jar is run through ProGuard before it
+is embedded, so the compiled Kotlin ships renamed rather than in the clear. The
+handful of names the Rust host and the JVM resolve by string — the
+`@KitsuneEntrypoint` class, the JNI bridge, the AOT training main — are held
+back from the rename; everything else is mangled, and `@kotlin.Metadata` is
+stripped so the original names cannot be read straight back out. This is name
+obfuscation, not a security boundary — a speed bump for reverse engineering, on
+by default and switchable off. See [Configuration](#configuration).
+
 ## What it looks like
 
 Here is the entire backend of a small app:
@@ -324,7 +333,7 @@ kitsune {
     entrypoint.set(layout.projectDirectory.file("../src-tauri/src/jvm/entrypoint.rs"))
 
     // Class whose main() is run to record the AOT profile.
-    trainingMainClass.set("revxrsal.kitsune.Training")
+    trainingMainClass.set("revxrsal.kitsune.aot.Training")
 
     // Shared by the AOT training runs and the host process. Changing this
     // list re-records the cache instead of breaking it.
@@ -339,6 +348,31 @@ kitsune {
 
 `compression` (`zip-0` through `zip-9`) and `excludeFiles` are available too, for
 squeezing the jlink image further.
+
+Obfuscation is on by default and configured here as well:
+
+```kotlin
+kitsune {
+    // Run the shipped jar through ProGuard. On by default; set false to ship
+    // the jar un-renamed.
+    obfuscate.set(true)
+
+    // The keep rules. Defaults to proguard-rules.pro beside the build script,
+    // which exempts the names the Rust host and the JVM resolve by string.
+    obfuscationRules.set(layout.projectDirectory.file("proguard-rules.pro"))
+
+    // The com.guardsquare:proguard-base version. Bump it when the JDK's
+    // class-file version outpaces what ProGuard can read.
+    proguardVersion.set("7.10.0")
+}
+```
+
+The jar is run through ProGuard whether or not obfuscation is enabled — with it
+off the jar is copied through untouched — so the same `dist/lib/app.jar` layout
+is produced either way and the AOT cache always trains against the jar that
+actually ships. The default rules keep it to renaming only (`-dontshrink
+-dontoptimize`); shrinking and optimization are yours to enable once you have
+confirmed a clean build.
 
 ## A note on the AOT training run
 
@@ -362,7 +396,7 @@ handle: no arguments, all-required, defaulted, nullable-and-defaulted, `Unit`,
 `object` members, and each of those again as `suspend`. Treat them as the test
 suite they are, and delete them when you start your own app.
 
-Linux is what it has been developed against. The runtime path logic covers
-macOS and Windows, but neither has been exercised.
+It has been developed against Linux, macOS and Windows, and the runtime path
+logic is verified working on all three.
 </parameter>
 </invoke>
