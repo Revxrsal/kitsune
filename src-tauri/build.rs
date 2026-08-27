@@ -23,7 +23,7 @@
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// The files that decide what `./gradlew shadowJar` produces. Everything else
 /// under `src-kitsune/` is either build output — `build/`, `.gradle/`,
@@ -39,8 +39,12 @@ const GRADLE_INPUTS: &[&str] = &[
     "settings.gradle.kts",
     "gradle.properties",
     "gradle/libs.versions.toml",
-    // A wrapper bump changes the Gradle version the whole build runs on.
+    // A wrapper bump changes the Gradle version the whole build runs on, and
+    // the daemon JVM criteria decide which JDK it runs *on* — :codegen is
+    // compiled to a class file version the daemon has to be able to load, so a
+    // change here fails :kspKotlin before any other input gets a say.
     "gradle/wrapper/gradle-wrapper.properties",
+    "gradle/gradle-daemon-jvm.properties",
     // What actually ends up in the jar. `src/test` is deliberately absent:
     // nothing in it reaches dist/, and editing a test should not cost a relink.
     "src/main",
@@ -88,7 +92,7 @@ fn main() {
     // dist/ off disk. This also lands before rustc reads the crate — KSP writes
     // src/jvm/entrypoint.rs, and a build script finishes before compilation of
     // its own crate begins, so the file generated here is the one compiled.
-    run_gradle(&kotlin);
+    run_gradle(&kotlin, &out);
 
     if !should_embed() {
         // include_bytes! still has to resolve, so the file has to exist.
@@ -157,42 +161,149 @@ fn track_gradle_inputs(kotlin: &Path) {
 /// `KITSUNE_SKIP_GRADLE=1` opts out, for builds that assemble `dist/` by some
 /// other route: a CI stage that builds the two halves separately, or bisecting
 /// the Rust side against a fixed image.
-fn run_gradle(kotlin: &Path) {
+///
+/// ## Why a log file and not `Command::output()`
+///
+/// Gradle's output has to go somewhere other than this script's stdout, which
+/// is Cargo's directive stream — but it must not go into a *pipe*.
+/// `output()` reads until EOF rather than until the child exits, and the
+/// wrapper forks a Gradle daemon that inherits the pipe and outlives it by
+/// design: the whole point of the daemon is to still be there for the next
+/// build. So the wrapper exits, this script would exit, and the read blocks on
+/// a write end nobody will ever close — for the daemon's idle timeout, three
+/// hours by default, and longer still every time another build resets it. From
+/// the outside `cargo build` simply hangs, silently, with no child process left
+/// to point at. It only bites the runs that *start* a daemon; a run that
+/// reuses a warm one never forks and never hangs, which is what makes it look
+/// intermittent.
+///
+/// Redirecting to a file sidesteps all of it: `status()` waits on the wrapper
+/// and nothing else, an inherited file handle blocks no one, and the log is
+/// still there to be read back into the panic below — and to be read by hand
+/// afterwards, which a pipe never allowed.
+fn run_gradle(kotlin: &Path, out: &Path) {
     if std::env::var("KITSUNE_SKIP_GRADLE").as_deref() == Ok("1") {
         return;
     }
 
-    // `--console=plain`: the output is captured, not attached to a terminal,
+    seal_cargo_pipes();
+
+    // `--console=plain`: the output is redirected, not attached to a terminal,
     // and the rich console's control codes make the panic below unreadable.
     let args = ["shadowJar", "--console=plain"];
 
-    // Rust will not exec a .bat directly, so Windows goes through cmd.
     let mut cmd = if cfg!(windows) {
+        // Rust will not exec a .bat directly, so Windows goes through cmd.
+        //
+        // `.\gradlew.bat`, not `gradlew.bat`: a bare name makes cmd *search*,
+        // and the working directory is only in that search order while
+        // NoDefaultCurrentDirectoryInExePath is unset — some sandboxes and
+        // group policies set it, and then the wrapper is simply "not
+        // recognized". An explicit relative path is resolved against the
+        // working directory instead of searched for, so it is unaffected.
+        //
+        // Relative and not absolute, though: `cmd /C` mangles a leading quoted
+        // token, so an absolute path would break the day this repo lives
+        // somewhere with a space in it.
         let mut cmd = Command::new("cmd");
-        cmd.arg("/C").arg("gradlew.bat").args(args);
+        cmd.arg("/C").arg(r".\gradlew.bat").args(args);
         cmd
     } else {
-        let mut cmd = Command::new("./gradlew");
+        // Absolute, because `current_dir` is documented not to decide how a
+        // *relative program path* is resolved — that is platform specific and
+        // explicitly unstable, and std's own advice is to pass an absolute
+        // path. `kotlin` descends from CARGO_MANIFEST_DIR, so it already is
+        // one. None of the cmd quoting caveats above apply here: this is an
+        // execve, not a shell.
+        let mut cmd = Command::new(kotlin.join("gradlew"));
         cmd.args(args);
         cmd
     };
 
-    // Captured rather than inherited: this script's stdout is Cargo's directive
-    // stream, and Gradle has no business writing into it.
-    let out = cmd
+    let path = out.join("gradle.log");
+    let log = File::create(&path)
+        .unwrap_or_else(|e| panic!("cannot create {}: {e}", path.display()));
+    // Two handles onto one file share a file position, so this interleaves the
+    // two streams in order rather than having them overwrite each other.
+    let errors = log.try_clone().unwrap();
+
+    let status = cmd
         .current_dir(kotlin)
-        .output()
+        // Nothing here is interactive, and a Gradle that finds itself with an
+        // inherited console can block on a prompt no one will ever see.
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log))
+        .stderr(Stdio::from(errors))
+        .status()
         .unwrap_or_else(|e| panic!("cannot run the Gradle wrapper in {}: {e}", kotlin.display()));
 
     assert!(
-        out.status.success(),
-        "./gradlew shadowJar failed in {} ({})\n\n{}{}",
+        status.success(),
+        "./gradlew shadowJar failed in {} ({status})\n\n{}",
         kotlin.display(),
-        out.status,
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr),
+        fs::read_to_string(&path).unwrap_or_default(),
     );
 }
+
+/// Stops this script's stdout and stderr from being inherited by anything the
+/// Gradle wrapper spawns.
+///
+/// Windows hands a child *every* handle marked inheritable, not only the three
+/// a parent redirects. Cargo runs a build script with its stdout and stderr on
+/// pipes that it reads itself — that is how the `cargo::` directives above get
+/// back to it — and those arrive inheritable, so `cmd`, the wrapper JVM and
+/// finally the Gradle daemon each end up holding a duplicate of the write ends.
+/// The daemon is precisely the one process that outlives the build on purpose,
+/// and Cargo reads those pipes until EOF rather than until this script exits.
+/// So `cargo build` sits there, silently, long after the build script is gone
+/// and with no child process left to point at, until the daemon happens to die
+/// — three hours, by default, reset by every build that reuses it.
+///
+/// Redirecting Gradle's own output to a file (see `run_gradle`) fixes this
+/// script's wait but not Cargo's: these duplicates are inherited no matter what
+/// the child's own stdio are pointed at. Clearing HANDLE_FLAG_INHERIT closes it
+/// at the first hop, and disturbs neither the redirections std sets up for the
+/// child — it duplicates those itself, after this runs — nor this script's own
+/// writes to stdout.
+///
+/// Unix needs none of it, hence the no-op: a descriptor survives exec only as
+/// 0/1/2 or without CLOEXEC, `run_gradle` redirects the first three, and std
+/// opens everything else CLOEXEC.
+///
+/// What this deliberately does not reach: inheritance is transitive, so if
+/// *Cargo's own* stdout is a pipe — `cargo build | tee`, or a CI runner
+/// capturing the log — then a duplicate of that pipe was inherited into this
+/// process before any of our code ran, at a handle number we have no way to
+/// name, and it rides along to the daemon exactly as before. Cargo itself is
+/// unaffected and exits; whatever is reading Cargo is the one left waiting. An
+/// interactive terminal is a console handle rather than a pipe and does not
+/// care, which is why the ordinary case is covered. CI that pipes should be
+/// building the two halves separately anyway — that is what
+/// `KITSUNE_SKIP_GRADLE=1` is for.
+#[cfg(windows)]
+fn seal_cargo_pipes() {
+    use std::ffi::c_void;
+    use std::io::{stderr, stdout};
+    use std::os::windows::io::AsRawHandle;
+
+    const HANDLE_FLAG_INHERIT: u32 = 0x0000_0001;
+
+    unsafe extern "system" {
+        fn SetHandleInformation(handle: *mut c_void, mask: u32, flags: u32) -> i32;
+    }
+
+    // The handles are this process's own and live for its whole lifetime, so
+    // there is nothing here to invalidate them. A failure is not worth failing
+    // a build over either: the worst case is the hang described above, which is
+    // exactly where not calling this at all would leave us.
+    unsafe {
+        SetHandleInformation(stdout().as_raw_handle(), HANDLE_FLAG_INHERIT, 0);
+        SetHandleInformation(stderr().as_raw_handle(), HANDLE_FLAG_INHERIT, 0);
+    }
+}
+
+#[cfg(not(windows))]
+fn seal_cargo_pipes() {}
 
 /// Appends `dir` under `prefix`, sorted, with every field that varies between
 /// two builds of identical content flattened out.
