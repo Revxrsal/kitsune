@@ -255,6 +255,8 @@ A JVM inside a desktop app invites one question ahead of every other: what does
 it cost in RAM? For the sample app, idle with its window open, the answer is
 about **120 MB resident**, and the JVM is the smaller half of that.
 
+### Windows
+
 | | |
 | --- | --- |
 | Private working set, whole process tree | **126 MB** |
@@ -304,6 +306,58 @@ all: it counts every shared DLL page once per WebView2 process.
 > one configuration: your heap, your webview content, your OS and your GPU will
 > all move these figures. Treat them as an order of magnitude and measure your
 > own app.
+
+### macOS
+
+The same shape holds on macOS, where the webview is WebKit (`WKWebView`)
+rather than WebView2 and each app gets its own set of WebKit XPC helper
+processes. Idle at its window, the sample app's whole tree is about **105 MB**
+of physical footprint, and again the JVM is the smaller half.
+
+| | |
+| --- | --- |
+| Physical footprint, whole process tree | **~105 MB** |
+| Post-GC live heap (`jcmd … GC.run` then `GC.heap_info`) | **~1.0 MB** |
+
+Where it goes, per process (macOS `vmmap` *physical footprint*):
+
+```
+com.apple.WebKit.WebContent   renderer            31.8 MB
+com.apple.WebKit.GPU          gpu                 15.9 MB
+com.apple.WebKit.Networking   network              6.4 MB
+                                                 ────────
+WebKit total                                      ~54 MB    (52%)
+
+kitsune            Rust host + JVM                50.8 MB   (48%)
+```
+
+There is no `java` process here either. `JavaVM::with_libjvm` `dlopen`s
+`libjvm.dylib` from the unpacked runtime and creates the VM in-process through
+the invocation API, so the whole Kotlin runtime lives inside that same
+50.8 MB as the Rust host — you can see `libjvm.dylib` mapped straight into the
+`kitsune` process in `vmmap`. The webview costs slightly more than the language
+runtime does.
+
+`jcmd`, attached to the running app (its PID *is* the JVM), shows the same
+picture as on Windows: after a forced GC the live heap is ~1.0 MB, metaspace
+1.9 MB used (2.0 MB committed), code cache 1.5 MB used, 18 threads. Almost all
+of the ~30 MB the JVM contributes is fixed runtime overhead, not anything the
+app allocated.
+
+**Committed is not resident**, here too. With `-Xmx512m` and no `-Xms`, HotSpot
+reserves ~253 MB of Java heap up front (a 78 MB young generation and a 175 MB
+tenured space) against a ~1 MB live set. Those pages are reserved address space,
+not touched RAM, which is why the process only shows ~51 MB resident despite the
+quarter-gigabyte heap reservation.
+
+> **About these numbers.** They come from one machine (macOS 26.5.2 build
+> 25F84, Apple M2 Pro, 16 GB RAM, system WebKit 26.5.2) running the release
+> build of the sample app, warm and idle at its window. Footprints are macOS
+> `vmmap --summary` *physical footprint*, which excludes shared and clean
+> file-backed pages, so they are not directly comparable to the Windows private
+> working-set figures above — both are "real RAM the app costs", measured the
+> way each platform reports it. As before, treat them as an order of magnitude
+> and measure your own app.
 
 ## How it fits together
 
