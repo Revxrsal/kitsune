@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-dev
 dist-ssr
 *.local
 
@@ -18,9 +19,9 @@ dist-ssr
 .idea/*
 !.idea/.gitignore
 !.idea/vcs.xml
-!.idea/modules.xml
-!.idea/modules/
-!.idea/modules/**
+# IntelliJ generated module metadata is machine-specific (absolute paths, JDK
+# names) and is regenerated from Gradle on import — never version-control it.
+*.iml
 .DS_Store
 *.suo
 *.ntvs*
