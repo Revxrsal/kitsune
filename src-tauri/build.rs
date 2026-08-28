@@ -78,7 +78,12 @@ fn main() {
     let manifest = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
     // CARGO_MANIFEST_DIR is src-tauri/; the Gradle build is its sibling.
     let kotlin = manifest.parent().unwrap().join("src-kitsune");
-    let dist = kotlin.join("dist");
+    // Debug and release own separate dist trees so alternating between them does
+    // not re-run the non-deterministic ProGuard/AOT steps against a shared image
+    // (see the distDir comment in kitsune.jlink.gradle.kts). This mirrors the
+    // obfuscate flag run_gradle sets: embedding builds obfuscate into dist/,
+    // debug builds skip it into dist-dev/. Kept in lockstep with should_embed().
+    let dist = kotlin.join(if should_embed() { "dist" } else { "dist-dev" });
     let out = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
     let blob = out.join("dist.tar.zst");
 

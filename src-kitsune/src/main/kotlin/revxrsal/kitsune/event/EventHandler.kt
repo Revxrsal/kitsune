@@ -16,39 +16,50 @@ import revxrsal.kitsune.ipc.KitsuneCbor
  * Everything is a flat array indexed by the event's **ordinal**, which is what
  * the payload carries in its first two bytes, so dispatch costs a bounds check
  * and two loads, and no part of the frame has to be decoded to find out where it
- * goes. [ids], [serializers], [listeners] and [suspendingListeners] are parallel:
- * index *i* is the same event in all four, which the generator guarantees by
- * building them in one pass.
+ * goes. [ids], [eventClasses], [serializers], [listeners] and
+ * [suspendingListeners] are parallel: index *i* is the same event in all five,
+ * which the generator guarantees by building them in one pass.
  *
- * [classNames] is the exception, and is sorted by class name so that the
- * `reified` [dispatch] can search it; [ordinalsByClassName] carries the ordinals
- * it would otherwise have lost. Both come sorted from the generator, which knows
- * the whole table at build time, so nothing is arranged at runtime.
+ * The `reified` [dispatch] resolves a type to its ordinal through [eventClasses],
+ * keyed on the `Class` object itself rather than its name. The class object's
+ * identity survives name obfuscation, where a name string does not:
+ * `T::class.java.name` at a call site returns the *renamed* class, which no
+ * longer equals a build-time string literal of the original name. Keying on the
+ * class sidesteps that entirely, and costs one identity-hashed lookup.
  *
  * [ids] is here for diagnostics, and for [ordinalOf]. Nothing dispatches on it.
  */
 class EventHandler(
     private val ids: Array<String>,
-    private val classNames: Array<String>,
-    private val ordinalsByClassName: IntArray,
+    eventClasses: Array<Class<*>>,
     private val serializers: Array<KSerializer<*>>,
     private val listeners: Array<Array<(Any) -> Unit>>,
     private val suspendingListeners: Array<Array<suspend (Any) -> Unit>>,
     private val scope: CoroutineScope = KitsuneScope,
 ) {
 
+    /**
+     * Each exported event type mapped to the ordinal the rest of the tables are
+     * indexed by. Built once from [eventClasses], which arrives in ordinal order,
+     * so the value at a class is its index there.
+     */
+    private val ordinalByClass: Map<Class<*>, Int> =
+        HashMap<Class<*>, Int>(eventClasses.size).apply {
+            for ((ordinal, cls) in eventClasses.withIndex()) put(cls, ordinal)
+        }
+
     init {
         require(
             ids.size == serializers.size &&
                     ids.size == listeners.size &&
                     ids.size == suspendingListeners.size &&
-                    ids.size == classNames.size &&
-                    ids.size == ordinalsByClassName.size
+                    ids.size == eventClasses.size &&
+                    ids.size == ordinalByClass.size
         ) {
             "Event tables disagree on how many events there are: ${ids.size} ids, " +
                     "${serializers.size} serializers, ${listeners.size} listener rows, " +
                     "${suspendingListeners.size} suspending listener rows, " +
-                    "${classNames.size} class names, ${ordinalsByClassName.size} class ordinals"
+                    "${eventClasses.size} event classes, ${ordinalByClass.size} distinct classes"
         }
     }
 
@@ -68,12 +79,12 @@ class EventHandler(
      * Raises [event] under the ordinal its type was exported at, forwarding it
      * outward and then to the local listeners, as [dispatch] does.
      *
-     * `reified` buys exactly one thing here (the class name, without the caller
-     * having to name the type twice), so that is all this function does with it.
-     * The work is [dispatchNamed]'s, which is what lets the tables stay private.
+     * `reified` buys exactly one thing here (the event's `Class`, without the
+     * caller having to name the type twice), so that is all this function does
+     * with it. The work is [dispatchByClass]'s, which lets the tables stay private.
      */
     inline fun <reified T : Any> dispatch(event: T) {
-        dispatchNamed(T::class.java.name, event)
+        dispatchByClass(T::class.java, event)
     }
 
     /**
@@ -83,14 +94,10 @@ class EventHandler(
      */
     @PublishedApi
     @OptIn(ExperimentalSerializationApi::class)
-    internal fun dispatchNamed(className: String, event: Any) {
-        val found = classNames.binarySearch(className)
-        if (found < 0) {
-            throw NoSuchElementException(
-                "$className is not an exported event. Known: ${ids.size} events, ${ids.asList()}"
-            )
-        }
-        val ordinal = ordinalsByClassName[found]
+    internal fun dispatchByClass(eventClass: Class<*>, event: Any) {
+        val ordinal = ordinalByClass[eventClass] ?: throw NoSuchElementException(
+            "${eventClass.name} is not an exported event. Known: ${ids.size} events, ${ids.asList()}"
+        )
 
         @Suppress("UNCHECKED_CAST")
         val serializer = serializers[ordinal] as KSerializer<Any>

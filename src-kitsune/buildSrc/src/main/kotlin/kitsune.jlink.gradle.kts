@@ -80,7 +80,16 @@ val objcopy = providers.provider {
         ?.absolutePath
 }
 
-val distDir = layout.projectDirectory.dir("dist")
+// Debug and release builds must not share one dist/. They disagree on
+// obfuscate, so alternating between them re-runs ProGuard and, because both it
+// and the AOT recording are non-deterministic, rewrites app.jar and app.aot to
+// fresh bytes on every switch. A release embed keyed on that dist/ can then
+// drift from what the Rust host loads and fail under -XX:AOTMode=on. Keyed on
+// the same flag build.rs sets (obfuscate=false on debug), each mode owns its own
+// tree, so within a mode dist/ stays up-to-date and a debug build never
+// invalidates the image a release binary embedded. Resolved eagerly because
+// every task below wires its output path off it at configuration time.
+val distDir = layout.projectDirectory.dir(if (kitsune.obfuscate.get()) "dist" else "dist-dev")
 val shadowJar = tasks.named<Jar>("shadowJar")
 
 // ProGuard, resolved from the project's repositories at execution time. The
@@ -224,4 +233,6 @@ tasks.named("assemble") { dependsOn(dist) }
 tasks.named("check") { dependsOn(verifyAotCache) }
 
 // dist/ is build output like build/ is, now that the jar lands there directly.
-tasks.named<Delete>("clean") { delete(distDir) }
+// Both mode trees are deleted regardless of which flag `clean` is invoked with,
+// so a bare `./gradlew clean` does not leave the other mode's image behind.
+tasks.named<Delete>("clean") { delete("dist", "dist-dev") }

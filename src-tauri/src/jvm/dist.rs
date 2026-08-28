@@ -20,8 +20,8 @@ pub struct JavaDist {
 
 impl JavaDist {
     /// Release builds unpack the image embedded in the binary; debug builds read
-    /// `src-kitsune/dist` in place, so iterating on the Kotlin half does not also
-    /// mean recompressing 54 MB.
+    /// `src-kitsune/dist-dev` in place, so iterating on the Kotlin half does not
+    /// also mean recompressing 54 MB.
     pub fn locate() -> Result<Self> {
         let root = match std::env::var_os(ROOT_ENV) {
             Some(root) => PathBuf::from(root),
@@ -107,13 +107,16 @@ fn default_root() -> Result<PathBuf> {
         return Ok(beside_exe.to_path_buf());
     }
 
-    // CARGO_MANIFEST_DIR is src-tauri/; the Gradle build is its sibling.
+    // CARGO_MANIFEST_DIR is src-tauri/; the Gradle build is its sibling. Debug
+    // builds run obfuscate=false, which lands in dist-dev/, kept separate from
+    // the release dist/ so the two modes do not thrash a shared image (see the
+    // distDir comment in kitsune.jlink.gradle.kts and build.rs).
     let dev = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
-        .join("src-kitsune/dist");
+        .join("src-kitsune/dist-dev");
     if dev.join("runtime").is_dir() {
         return Ok(dev);
     }
-    bail!("no runtime found; run ./gradlew dist in src-kitsune/ first")
+    bail!("no runtime found; run `./gradlew dist -Pkitsune.obfuscate=false` in src-kitsune/ first")
 }

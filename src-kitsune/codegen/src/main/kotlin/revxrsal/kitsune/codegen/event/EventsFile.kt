@@ -35,6 +35,9 @@ class RegisteredListener(
     val id: String,
 )
 
+/** `java.lang.Class<*>`, the key type of the `eventClasses` table. */
+private val ClassStar = ClassName("java.lang", "Class").parameterizedBy(STAR)
+
 /** `(Any) -> Unit`, the shape every listener is erased to in the tables. */
 private val ListenerType = LambdaTypeName.get(parameters = arrayOf(ANY), returnType = UNIT)
 
@@ -87,35 +90,23 @@ fun writeEventsFile(
             .build()
     )
 
-    // The class-name table is the one lookup that cannot reuse the ordinal
-    // order: ordinals were handed out by sorting the *ids*, and an id is the
-    // simple name, so the qualified names sit in no order of their own. Sorting
-    // them makes them searchable but breaks the parallel-array invariant the
-    // other tables hold to, so the ordinals come along in `ordinalsByClassName`:
-    // index *i* of one is index *i* of the other, and the value there is the
-    // ordinal the rest of the tables are indexed by.
-    val byClassName = events.withIndex().sortedBy { it.value.qualifiedName }
-
+    // The type each event dispatches under, in ordinal order like every other
+    // table. The handler keys its lookup on the `Class` object itself, not its
+    // name: class identity survives obfuscation, where a name string laid out at
+    // build time does not (`T::class.java.name` at a call site would return the
+    // renamed class and miss). So no sorted side table is needed here — this one
+    // stays parallel with the rest.
     generated.addProperty(
-        PropertySpec.builder("classNames", ARRAY.parameterizedBy(STRING))
+        PropertySpec.builder("eventClasses", ARRAY.parameterizedBy(ClassStar))
             .addKdoc(
-                "Every event's qualified class name, sorted, so a name maps back\n" +
-                        "through `binarySearch`. Not in ordinal order: see\n" +
-                        "[ordinalsByClassName].\n"
+                "Every event's `Class`, in ordinal order. Keyed on by the handler to\n" +
+                        "map a dispatched type back to its ordinal; see [%T].\n",
+                Runtime.EventHandler,
             )
             .addAnnotation(JvmFieldClass)
-            .initializer(table(byClassName) { CodeBlock.of("%S", it.value.qualifiedName) })
-            .build()
-    )
-
-    generated.addProperty(
-        PropertySpec.builder("ordinalsByClassName", INT_ARRAY)
-            .addKdoc(
-                "The ordinal of the class name at the same index of [classNames],\n" +
-                        "which is what turns a hit in that search into a table index.\n"
+            .initializer(
+                table(events, ClassStar) { CodeBlock.of("%T::class.java", it.className) }
             )
-            .addAnnotation(JvmFieldClass)
-            .initializer(intTable(byClassName.map { it.index }))
             .build()
     )
 
@@ -146,7 +137,7 @@ fun writeEventsFile(
             .returns(Runtime.EventHandler)
             .addCode(
                 CodeBlock.of(
-                    "return %T(ids, classNames, ordinalsByClassName, serializers, listeners, " +
+                    "return %T(ids, eventClasses, serializers, listeners, " +
                         "suspendingListeners)\n",
                     Runtime.EventHandler,
                 )
@@ -208,13 +199,3 @@ private fun <T> table(
     }
     add(")")
 }
-
-/**
- * An `intArrayOf(...)` over [values], on one line.
- *
- * Ordinals are short enough to read across, and this table is only meaningful
- * read against [table]'s output anyway, so a line per entry would just push the
- * two apart.
- */
-private fun intTable(values: List<Int>): CodeBlock =
-    CodeBlock.of("intArrayOf(%L)", values.joinToString(", "))
