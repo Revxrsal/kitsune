@@ -8,8 +8,6 @@ import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.buildCodeBlock
 
-/** `kotlinx.serialization.KSerializer`, the type each cached serializer is held as. */
-val KSerializerClass = com.squareup.kotlinpoet.ClassName("kotlinx.serialization", "KSerializer")
 
 /** Package qualifiers, dropped when a type is turned into an identifier. */
 private val QUALIFIER = Regex("""[A-Za-z0-9_]+\.""")

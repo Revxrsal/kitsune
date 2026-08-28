@@ -1,21 +1,17 @@
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import reactLogo from "./assets/react.svg";
 import "./App.css";
-import {emitEvent, SomeEvent, warmUp} from "./bindings.ts";
+import {reverse, warmUp} from "./bindings.ts";
 
 void warmUp()
 
 function App() {
   const [name, setName] = useState("");
-  const [button, setButton] = useState("Greet")
+  const [reversed, setReversed] = useState("");
 
-  async function greet() {
-    await emitEvent()
-    await SomeEvent.emit({id: 20})
-    SomeEvent.listen(v => console.log(v));
-    setButton("Greet");
-    console.log(name)
-  }
+  useEffect(() => {
+    reverse({value: name}).then(setReversed)
+  }, [name]);
 
   return (
     <main className="container">
@@ -35,10 +31,8 @@ function App() {
       <p>Click on the Tauri, Vite, and React logos to learn more.</p>
 
       <form
-        className="row"
         onSubmit={(e) => {
           e.preventDefault();
-          greet();
         }}
       >
         <input
@@ -46,7 +40,7 @@ function App() {
           onChange={(e) => setName(e.currentTarget.value)}
           placeholder="Enter a name..."
         />
-        <button type="submit">{button}</button>
+        <p>{reversed}</p>
       </form>
     </main>
   );

@@ -25,6 +25,9 @@ dependencies {
     // in is not, and neither are the dispatchers behind it. See ipc/Scope.kt.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
+    // Resolves system directories.
+    implementation("dev.dirs:directories:26")
+
     // `ksp`, not `implementation`: the processor runs at compile time and must
     // stay off the runtime classpath; it drags in kotlinpoet and the KSP API,
     // neither of which the shipped jar has any use for.
@@ -93,4 +96,5 @@ ksp {
     arg("kitsune.bindings", kitsune.bindings.map { it.asFile.absolutePath }.orElse(""))
     arg("kitsune.bridgeImport", kitsune.bridgeImport)
     arg("kitsune.entrypoint", kitsune.entrypoint.map { it.asFile.absolutePath }.orElse(""))
+    arg("kitsune.tauriConfig", "../src-tauri/tauri.conf.json")
 }

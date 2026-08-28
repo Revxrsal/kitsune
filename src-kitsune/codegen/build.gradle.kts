@@ -5,6 +5,12 @@ plugins {
     // version on the build classpath, and declaring a second version here is
     // what produces "plugin already on the classpath with a different version".
     kotlin("jvm")
+
+    // Same reason there is no version here: the root build already applies the
+    // serialization plugin, which puts its marker on the shared build
+    // classpath. The processor needs it in its own right, not by inheritance --
+    // it declares @Serializable classes of its own for the Tauri config.
+    kotlin("plugin.serialization")
 }
 
 // Subprojects do not inherit the root project's repositories.
@@ -24,6 +30,13 @@ dependencies {
     // with KSP's incremental machinery instead of written behind its back.
     implementation("com.squareup:kotlinpoet:2.3.0")
     implementation("com.squareup:kotlinpoet-ksp:2.3.0")
+
+    // tauri.conf.json is read at *processing* time, so the JSON format is a
+    // dependency of the processor and not of the app: nothing kotlinx-json
+    // provides survives into the shipped jar. Held at the same 1.11.0 as :app's
+    // kotlinx-serialization-cbor, since the runtime artifacts move as one line
+    // and the plugin generates against whichever is on this classpath.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 }
 
 kotlin {

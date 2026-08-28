@@ -29,7 +29,7 @@ import revxrsal.kitsune.codegen.util.ContinuationClass
 import revxrsal.kitsune.codegen.util.DecodeStructure
 import revxrsal.kitsune.codegen.util.DecoderClass
 import revxrsal.kitsune.codegen.util.DefaultConstructorMarkerType
-import revxrsal.kitsune.codegen.util.SerializerStrategyClass
+import revxrsal.kitsune.codegen.util.DeserializerStrategyClass
 import revxrsal.kitsune.codegen.util.INT_TYPE_BLOCK
 import revxrsal.kitsune.codegen.util.JavaObjectType
 import revxrsal.kitsune.codegen.util.LambdaMetafactoryClass
@@ -297,7 +297,7 @@ private fun ExportedFun.checkRequiredArguments(
  * fields on it rather than as captured locals. Captured `var`s would each be
  * boxed into a `Ref` (one allocation per parameter, per call, on top of the
  * decoder), whereas fields make it a single object the wrapper reads straight
- * out of. It is also why nothing here is a `KSerializer`: only [deserialize] is
+ * out of. It is also why nothing here is a `KSerializer`: only [kotlinx.serialization.DeserializationStrategy.deserialize] is
  * ever reached, and `Unit` is the honest return type for a decoder that writes
  * its results into itself.
  */
@@ -336,7 +336,7 @@ private fun ExportedFun.createDecoder(
     }
 
     return TypeSpec.anonymousClassBuilder()
-        .addSuperinterface(SerializerStrategyClass.parameterizedBy(UNIT))
+        .addSuperinterface(DeserializerStrategyClass.parameterizedBy(UNIT))
         .addProperties(parameters.map { it.toDecoderField(fields.getValue(it)) })
         .addProperties(masker.fields())
         .addProperty(

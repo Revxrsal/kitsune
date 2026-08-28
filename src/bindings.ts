@@ -33,9 +33,19 @@ export function emitEvent(): Promise<void> {
   return Bridge.call(0, {})
 }
 
+/** `revxrsal.kitsune.reverse` */
+export interface Args_reverse {
+  value: string
+}
+
+/** `revxrsal.kitsune.reverse` */
+export function reverse(args: Args_reverse): Promise<string> {
+  return Bridge.call(1, args)
+}
+
 /** `revxrsal.kitsune.warmUp` */
 export function warmUp(): Promise<void> {
-  return Bridge.call(1, {})
+  return Bridge.call(2, {})
 }
 
 // ---- events -------------------------------------------------------------------

@@ -37,6 +37,14 @@ mod spawn;
 ///
 /// Paths are relative to `src-kitsune/`. Directories are walked recursively by
 /// Cargo.
+///
+/// Kept in sync with `build.additionalWatchFolders` in tauri.conf.json, by
+/// hand, bar the one entry below that says why it is not watched. The two
+/// lists answer different questions and both have to say yes for a Kotlin edit
+/// to reach a running `tauri dev`: the CLI's watcher only ever looks at
+/// src-tauri/ and the crate's path dependencies, so without the config list a
+/// .kt edit never causes a `cargo build` at all, and this list decides whether
+/// that build reruns the script once one happens.
 const GRADLE_INPUTS: &[&str] = &[
     // Dependencies, plugin and Kotlin versions, the toolchain, and the
     // kitsune { } block the jlink and AOT tasks read their settings out of.
@@ -58,6 +66,11 @@ const GRADLE_INPUTS: &[&str] = &[
     // writes ../src/bindings.ts and src/jvm/entrypoint.rs.
     "codegen/build.gradle.kts",
     "codegen/src/main",
+    // The keep rules ProGuard runs with, at the default path
+    // `kitsune.obfuscationRules` points at. Only embedding builds obfuscate, so
+    // this is deliberately absent from tauri.conf.json's watch list: editing it
+    // cannot change what a debug `dist-dev/` contains.
+    "proguard-rules.pro",
     // The jlink / AOT / vmoptions tasks themselves.
     "buildSrc/build.gradle.kts",
     "buildSrc/settings.gradle.kts",

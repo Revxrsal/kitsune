@@ -19,6 +19,11 @@ dist-ssr
 .idea/*
 !.idea/.gitignore
 !.idea/vcs.xml
+# The Gradle build lives in src-kitsune/, not the project root, so IntelliJ can
+# only find it through gradle.xml. Nothing in it is machine-specific ($PROJECT_DIR$
+# paths, and the JVM is whatever the project SDK is), so it is tracked — without
+# it a fresh clone opens with no Gradle project at all.
+!.idea/gradle.xml
 # IntelliJ generated module metadata is machine-specific (absolute paths, JDK
 # names) and is regenerated from Gradle on import — never version-control it.
 *.iml

@@ -12,7 +12,14 @@ data class SomeEvent(val id: Int, val name: String = "hi")
 
 @ExportFunction
 fun emitEvent() {
+    println("appLocalDataDir: ${application.appLocalDataDir}")
+    println("appDataDir: ${application.appDataDir}")
     application.eventsHandler.dispatch(SomeEvent(1))
+}
+
+@ExportFunction
+fun reverse(value: String): String {
+    return value.reversed()
 }
 
 @Listener

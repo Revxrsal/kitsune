@@ -7,7 +7,19 @@
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build",
-    "frontendDist": "../dist"
+    "frontendDist": "../dist",
+    "additionalWatchFolders": [
+      "../src-kitsune/src/main",
+      "../src-kitsune/codegen/src/main",
+      "../src-kitsune/buildSrc/src/main",
+      "../src-kitsune/build.gradle.kts",
+      "../src-kitsune/settings.gradle.kts",
+      "../src-kitsune/codegen/build.gradle.kts",
+      "../src-kitsune/buildSrc/build.gradle.kts",
+      "../src-kitsune/buildSrc/settings.gradle.kts",
+      "../src-kitsune/gradle/wrapper/gradle-wrapper.properties",
+      "../src-kitsune/gradle/gradle-daemon-jvm.properties"
+    ]
   },
   "app": {
     "windows": [

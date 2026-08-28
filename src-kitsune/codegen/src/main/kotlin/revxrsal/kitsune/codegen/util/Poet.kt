@@ -25,7 +25,8 @@ val SerializerFunction = MemberName("kotlinx.serialization", "serializer")
  */
 val ExperimentalSerializationApiClass =
     ClassName("kotlinx.serialization", "ExperimentalSerializationApi")
-val SerializerStrategyClass = ClassName("kotlinx.serialization", "Serializer")
+val DeserializerStrategyClass = ClassName("kotlinx.serialization", "DeserializationStrategy")
+val KSerializerClass = ClassName("kotlinx.serialization", "KSerializer")
 val SerializationExceptionClass = ClassName("kotlinx.serialization", "SerializationException")
 
 val SerialDescriptorClass = ClassName("kotlinx.serialization.descriptors", "SerialDescriptor")
